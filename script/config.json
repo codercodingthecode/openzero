@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "experimental": {
+    "memory": {
+      "enabled": true,
+      "model": "openrouter/google/gemma-3-12b-it:free",
+      "embedding_model": "google/gemini-embedding-001",
+      "qdrant": {
+        "host": "localhost",
+        "port": 6333,
+        "auto_start": false
+      },
+      "max_results": 10
+    }
+  }
+}

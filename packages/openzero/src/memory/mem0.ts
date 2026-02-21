@@ -125,17 +125,39 @@ export namespace Mem0Integration {
    * Get the embedding dimension for a given embedding model
    */
   function getEmbeddingDimension(model: string): number {
-    // Common embedding model dimensions
     const dimensions: Record<string, number> = {
+      // OpenAI
       "text-embedding-3-small": 1536,
       "text-embedding-3-large": 3072,
       "text-embedding-ada-002": 1536,
+      // Ollama / nomic
+      "nomic-embed-text": 768,
+      "nomic-embed-text-v1": 768,
+      "nomic-embed-text-v1.5": 768,
+      // mxbai
+      "mxbai-embed-large": 1024,
+      "mxbai-embed-large-v1": 1024,
+      // all-minilm
+      "all-minilm": 384,
+      "all-minilm-l6-v2": 384,
+      "all-minilm-l12-v2": 384,
+      // Cohere
+      "embed-english-v3.0": 1024,
+      "embed-multilingual-v3.0": 1024,
+      "embed-english-light-v3.0": 384,
+      "embed-multilingual-light-v3.0": 384,
+      "embed-english-v2.0": 4096,
+      "embed-english-light-v2.0": 1024,
+      // Mistral
+      "mistral-embed": 1024,
+      // Voyage
+      "voyage-large-2": 1536,
+      "voyage-2": 1024,
+      "voyage-code-2": 1536,
     }
 
-    // Extract model name (handle both "openai/text-embedding-3-small" and "text-embedding-3-small")
     const modelName = model.includes("/") ? model.split("/")[1] : model
-
-    return dimensions[modelName] || 1536 // Default to 1536
+    return dimensions[modelName] ?? 1536
   }
 
   /**
@@ -165,7 +187,8 @@ export namespace Mem0Integration {
   export async function create(
     config: MemoryConfig.Info,
     projectPath: string,
-    providerApiKey?: string,
+    llmApiKey: string,
+    embedApiKey: string,
   ): Promise<Memory> {
     if (memoryInstance) {
       log.debug("reusing existing mem0 instance")
@@ -179,7 +202,7 @@ export namespace Mem0Integration {
 
     const memoryModel = parseModelString(model)
     const embeddingModel = parseModelString(embModel)
-    const embeddingDims = getEmbeddingDimension(embModel)
+    const embeddingDims = config?.embedding_dims ?? getEmbeddingDimension(embModel)
 
     log.info("initializing mem0", {
       memoryModel: model,
@@ -189,29 +212,20 @@ export namespace Mem0Integration {
       qdrantPort,
     })
 
-    // Get API key from environment or provider config
-    const apiKey = providerApiKey || process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      throw new Error(
-        "No API key found for memory provider. Please configure your OpenAI API key or the provider specified in memory.model.",
-      )
-    }
-
     try {
       memoryInstance = new Memory({
         llm: {
           provider: memoryModel.provider,
           config: {
             model: memoryModel.model,
-            apiKey: apiKey,
+            apiKey: llmApiKey,
           },
         },
         embedder: {
           provider: embeddingModel.provider,
           config: {
             model: embeddingModel.model,
-            apiKey: apiKey,
+            apiKey: embedApiKey,
           },
         },
         vectorStore: {
@@ -223,7 +237,7 @@ export namespace Mem0Integration {
             embedding_model_dims: embeddingDims,
           },
         },
-        disableHistory: true, // Disable sqlite3 history store - we only need Qdrant
+        disableHistory: true,
         customPrompt: MemoryPrompts.EXTRACTION_PROMPT,
       })
 

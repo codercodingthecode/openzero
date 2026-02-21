@@ -63,12 +63,7 @@ export const SettingsMemory: Component = () => {
     })
 
     if (models.length > 0) return models
-
-    return [
-      { value: "openai/text-embedding-3-small", label: "OpenAI - text-embedding-3-small (1536 dims)" },
-      { value: "openai/text-embedding-3-large", label: "OpenAI - text-embedding-3-large (3072 dims)" },
-      { value: "openai/text-embedding-ada-002", label: "OpenAI - text-embedding-ada-002 (1536 dims)" },
-    ]
+    return models
   })
 
   const updateMemoryConfig = async (updates: Record<string, any>) => {
@@ -163,6 +158,21 @@ export const SettingsMemory: Component = () => {
                 Embedding model is required
               </p>
             </Show>
+          </div>
+
+          {/* Embedding Dimensions (override) */}
+          <div class="flex flex-col gap-2">
+            <label class="text-13-medium">Embedding Dimensions (optional)</label>
+            <p class="text-12-regular text-text-weak mb-2">
+              Override the vector dimension for your embedding model. Only needed if your model is not in the built-in
+              dimension map (OpenAI, Ollama nomic/mxbai/all-minilm, Cohere, Mistral, Voyage are auto-detected).
+            </p>
+            <TextField
+              type="number"
+              value={config().embedding_dims != null ? String(config().embedding_dims) : ""}
+              onChange={(value) => updateMemoryConfig({ embedding_dims: value ? parseInt(value) : undefined })}
+              placeholder="e.g. 1536"
+            />
           </div>
 
           {/* Qdrant Settings */}

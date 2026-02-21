@@ -821,6 +821,7 @@ export type Session = {
   }
   title: string
   version: string
+  history?: string
   time: {
     created: number
     updated: number
@@ -969,6 +970,13 @@ export type EventMemoryMemorizeCompleted = {
   }
 }
 
+export type EventMemoryError = {
+  type: "memory.error"
+  properties: {
+    error: string
+  }
+}
+
 export type Event =
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
@@ -1017,6 +1025,7 @@ export type Event =
   | EventMemorySearchCompleted
   | EventMemoryMemorizeStarted
   | EventMemoryMemorizeCompleted
+  | EventMemoryError
 
 export type GlobalEvent = {
   directory: string
@@ -1885,7 +1894,7 @@ export type Config = {
   }
   compaction?: {
     /**
-     * Enable automatic compaction when context is full (default: true)
+     * Enable automatic compaction when context is full (default: false, uses hierarchical compression instead)
      */
     auto?: boolean
     /**
@@ -1941,6 +1950,19 @@ export type Config = {
        * Maximum number of memories to retrieve per search
        */
       max_results?: number
+      /**
+       * Vector dimension for the embedding model
+       */
+      embedding_dims?: number
+      recall?: {
+        enabled?: boolean
+        interval?: number
+        max_results?: number
+      }
+      auto_memorize?: {
+        enabled?: boolean
+        idle_timeout?: number
+      }
     }
   }
 }
@@ -2122,6 +2144,7 @@ export type GlobalSession = {
   }
   title: string
   version: string
+  history?: string
   time: {
     created: number
     updated: number

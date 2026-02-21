@@ -1227,6 +1227,20 @@ export namespace Config {
                 .optional()
                 .default(5)
                 .describe("Maximum number of memories to retrieve per search"),
+              embedding_dims: z.number().optional().describe("Vector dimension for the embedding model"),
+              recall: z
+                .object({
+                  enabled: z.boolean().optional(),
+                  interval: z.number().optional(),
+                  max_results: z.number().optional(),
+                })
+                .optional(),
+              auto_memorize: z
+                .object({
+                  enabled: z.boolean().optional(),
+                  idle_timeout: z.number().optional(),
+                })
+                .optional(),
             })
             .optional(),
         })

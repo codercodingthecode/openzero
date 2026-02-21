@@ -48,26 +48,34 @@ export const MemoryPlugin: Plugin = async (input) => {
       throw err
     })
 
-    // Get API key from Auth system based on the provider used
-    const embeddingProvider = memoryConfig.embedding_model?.split("/")[0] || "openai"
+    // Get API keys from Auth system for both providers
+    const llmProvider = memoryConfig.model?.split("/")[0]
+    const embedProvider = memoryConfig.embedding_model?.split("/")[0]
     const auth = await Auth.all()
-    let apiKey: string | undefined
 
-    // Try to find the API key for the embedding provider
-    for (const [key, value] of Object.entries(auth)) {
-      if (key === embeddingProvider && value.type === "api") {
-        apiKey = value.key
-        break
-      }
+    const llmEntry = llmProvider
+      ? Object.entries(auth).find(([k, v]) => k === llmProvider && v.type === "api")
+      : undefined
+    const embedEntry = embedProvider
+      ? Object.entries(auth).find(([k, v]) => k === embedProvider && v.type === "api")
+      : undefined
+    const llmApiKey = llmEntry?.[1].type === "api" ? llmEntry[1].key : undefined
+    const embedApiKey = embedEntry?.[1].type === "api" ? embedEntry[1].key : undefined
+
+    if (!llmApiKey) {
+      const msg = `No API key found for ${llmProvider}. Run: openzero auth add ${llmProvider}`
+      log.error(msg)
+      throw new Error(msg)
     }
 
-    if (!apiKey) {
-      log.error(`No API key found for ${embeddingProvider}. Configure it with: openzero auth add ${embeddingProvider}`)
-      throw new Error(`No API key found for ${embeddingProvider}. Please run: openzero auth add ${embeddingProvider}`)
+    if (!embedApiKey) {
+      const msg = `No API key found for ${embedProvider}. Run: openzero auth add ${embedProvider}`
+      log.error(msg)
+      throw new Error(msg)
     }
 
     // Initialize Mem0
-    const memory = await Mem0Integration.create(memoryConfig, input.directory, apiKey).catch((err) => {
+    const memory = await Mem0Integration.create(memoryConfig, input.directory, llmApiKey, embedApiKey).catch((err) => {
       log.error("failed to initialize mem0", { error: err })
       throw err
     })

@@ -46,7 +46,7 @@ export function DialogSettings() {
       auto_start: current.qdrant?.auto_start ?? true,
     }
 
-    await sdk.client.config.update({
+    await sdk.client.global.config.update({
       config: {
         experimental: {
           ...sync.data.config.experimental,
