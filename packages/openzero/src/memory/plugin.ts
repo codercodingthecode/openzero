@@ -3,10 +3,11 @@ import { Log } from "../util/log"
 import { Config } from "../config/config"
 import { QdrantManager } from "./qdrant"
 import { Mem0Integration } from "./mem0"
-import { MemoryHooks } from "./hooks"
+import { MemoryHooks, MemoryError } from "./hooks"
 import { MemoryTools } from "./tools"
 import { Session } from "../session"
 import { Auth } from "../auth"
+import { Bus } from "../bus"
 
 export const MemoryPlugin: Plugin = async (input) => {
   const log = Log.create({ service: "memory-plugin" })
@@ -91,10 +92,17 @@ export const MemoryPlugin: Plugin = async (input) => {
             .join(" ")
 
           if (userText && hookInput.sessionID) {
-            // Store for later
+            log.debug("tracking user message for memory", { sessionID: hookInput.sessionID, chars: userText.length })
             conversationTracker.set(hookInput.sessionID, {
               userMessage: userText,
               assistantMessage: "",
+            })
+          } else {
+            log.warn("skipping user message tracking", {
+              sessionID: hookInput.sessionID,
+              hasText: !!userText,
+              partCount: output.parts.length,
+              partTypes: output.parts.map((p) => p.type),
             })
           }
         } catch (error) {
@@ -127,7 +135,14 @@ export const MemoryPlugin: Plugin = async (input) => {
       "experimental.text.complete": async (hookInput, output) => {
         try {
           const conversation = conversationTracker.get(hookInput.sessionID)
-          if (!conversation || !conversation.userMessage) return
+          if (!conversation || !conversation.userMessage) {
+            log.warn("text.complete fired but no tracked user message found", {
+              sessionID: hookInput.sessionID,
+              hasEntry: !!conversation,
+              trackerSize: conversationTracker.size,
+            })
+            return
+          }
 
           // Update assistant message
           conversation.assistantMessage = output.text
@@ -161,7 +176,6 @@ export const MemoryPlugin: Plugin = async (input) => {
     log.error("memory plugin initialization failed", { error })
 
     // Emit error event so TUI can show it
-    const { MemoryError } = await import("./hooks")
     await Bus.publish(MemoryError, { error: errorMessage })
 
     // Return empty hooks on error - don't crash OpenCode
