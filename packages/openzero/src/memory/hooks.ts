@@ -5,6 +5,7 @@ import type { MemoryConfig } from "./config"
 import { Bus } from "../bus"
 import { BusEvent } from "../bus/bus-event"
 import z from "zod"
+import { performance } from "node:perf_hooks"
 
 // Define memory events
 export const MemorySearchStarted = BusEvent.define(
@@ -40,6 +41,8 @@ export const MemoryError = BusEvent.define(
 export namespace MemoryHooks {
   const log = Log.create({ service: "memory-hooks" })
 
+  const durationMs = (start: number) => Math.round((performance.now() - start) * 100) / 100
+
   /**
    * Called before each user message is processed.
    * Searches for relevant memories and injects them into the system prompt.
@@ -51,6 +54,7 @@ export namespace MemoryHooks {
     systemPrompt: string[],
     config: MemoryConfig.Info | undefined,
   ): Promise<void> {
+    const start = performance.now()
     try {
       const maxResults = config?.max_results || 5
 
@@ -67,7 +71,7 @@ export namespace MemoryHooks {
         return
       }
 
-      log.info("injecting memories into system prompt", { count: memories.length })
+      log.info("injecting memories into system prompt", { count: memories.length, durationMs: durationMs(start) })
 
       // Build memory context
       const memoryContext = [
@@ -84,6 +88,7 @@ export namespace MemoryHooks {
       log.error("failed to search memories", { error })
       // Emit completed event even on error
       await Bus.publish(MemorySearchCompleted, { count: 0 })
+      log.debug("memory search errored", { durationMs: durationMs(start) })
     }
   }
 
@@ -97,6 +102,7 @@ export namespace MemoryHooks {
     userMessage: string,
     assistantMessage: string,
   ): Promise<void> {
+    const start = performance.now()
     try {
       log.debug("memorizing conversation")
 
@@ -117,14 +123,15 @@ export namespace MemoryHooks {
       await Bus.publish(MemoryMemorizeCompleted, { count })
 
       if (count > 0) {
-        log.info("saved memories", { count })
+        log.info("saved memories", { count, durationMs: durationMs(start) })
       } else {
-        log.debug("no new memories extracted")
+        log.debug("no new memories extracted", { durationMs: durationMs(start) })
       }
     } catch (error) {
       log.error("failed to save memories", { error })
       // Emit completed event even on error
       await Bus.publish(MemoryMemorizeCompleted, { count: 0 })
+      log.debug("memory save errored", { durationMs: durationMs(start) })
     }
   }
 }

@@ -3,6 +3,7 @@ import type { MemoryConfig } from "./config"
 import { Log } from "../util/log"
 import { MemoryPrompts } from "./prompts"
 import crypto from "crypto"
+import { performance } from "node:perf_hooks"
 
 export namespace Mem0Integration {
   const log = Log.create({ service: "mem0" })
@@ -19,6 +20,106 @@ export namespace Mem0Integration {
   }
 
   let memoryInstance: Memory | null = null
+
+  function durationMs(start: number): number {
+    return Math.round((performance.now() - start) * 100) / 100
+  }
+
+  function wrapTiming<T extends (...args: any[]) => Promise<any>>(
+    label: string,
+    fn: T,
+    extra?: (args: Parameters<T>) => Record<string, any>,
+  ): T {
+    return (async (...args: Parameters<T>) => {
+      const start = performance.now()
+      try {
+        return await fn(...args)
+      } finally {
+        log.info("mem0 timing", {
+          step: label,
+          durationMs: durationMs(start),
+          ...(extra ? extra(args) : {}),
+        })
+      }
+    }) as T
+  }
+
+  function instrumentMemory(memory: Memory): void {
+    let llmCalls = 0
+    if (memory.llm?.generateResponse) {
+      const original = memory.llm.generateResponse.bind(memory.llm)
+      memory.llm.generateResponse = wrapTiming("llm.generateResponse", original, (args) => {
+        const messages = args[0]
+        const promptChars = Array.isArray(messages)
+          ? messages.reduce((sum, msg) => {
+              const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)
+              return sum + content.length
+            }, 0)
+          : 0
+        llmCalls += 1
+        return {
+          call: llmCalls,
+          promptChars,
+          responseFormat: args[1]?.type,
+        }
+      })
+    }
+
+    if (memory.embedder?.embed) {
+      const original = memory.embedder.embed.bind(memory.embedder)
+      memory.embedder.embed = wrapTiming("embedder.embed", original, (args) => ({
+        textChars: typeof args[0] === "string" ? args[0].length : JSON.stringify(args[0]).length,
+      }))
+    }
+
+    if (memory.embedder?.embedBatch) {
+      const original = memory.embedder.embedBatch.bind(memory.embedder)
+      memory.embedder.embedBatch = wrapTiming("embedder.embedBatch", original, (args) => ({
+        count: Array.isArray(args[0]) ? args[0].length : 0,
+      }))
+    }
+
+    if (memory.vectorStore?.search) {
+      const original = memory.vectorStore.search.bind(memory.vectorStore)
+      memory.vectorStore.search = wrapTiming("vectorStore.search", original, (args) => ({
+        limit: args[1],
+      }))
+    }
+
+    if (memory.vectorStore?.insert) {
+      const original = memory.vectorStore.insert.bind(memory.vectorStore)
+      memory.vectorStore.insert = wrapTiming("vectorStore.insert", original, (args) => ({
+        count: Array.isArray(args[0]) ? args[0].length : 0,
+      }))
+    }
+
+    if (memory.vectorStore?.update) {
+      const original = memory.vectorStore.update.bind(memory.vectorStore)
+      memory.vectorStore.update = wrapTiming("vectorStore.update", original)
+    }
+
+    if (memory.vectorStore?.get) {
+      const original = memory.vectorStore.get.bind(memory.vectorStore)
+      memory.vectorStore.get = wrapTiming("vectorStore.get", original)
+    }
+
+    if (memory.vectorStore?.delete) {
+      const original = memory.vectorStore.delete.bind(memory.vectorStore)
+      memory.vectorStore.delete = wrapTiming("vectorStore.delete", original)
+    }
+
+    if (memory.vectorStore?.list) {
+      const original = memory.vectorStore.list.bind(memory.vectorStore)
+      memory.vectorStore.list = wrapTiming("vectorStore.list", original, (args) => ({
+        limit: args[1],
+      }))
+    }
+
+    if (memory.db?.addHistory) {
+      const original = memory.db.addHistory.bind(memory.db)
+      memory.db.addHistory = wrapTiming("history.add", original)
+    }
+  }
 
   /**
    * Get the embedding dimension for a given embedding model
@@ -126,6 +227,8 @@ export namespace Mem0Integration {
         customPrompt: MemoryPrompts.EXTRACTION_PROMPT,
       })
 
+      instrumentMemory(memoryInstance)
+
       log.info("mem0 initialized successfully")
       return memoryInstance
     } catch (error) {
@@ -144,9 +247,13 @@ export namespace Mem0Integration {
     limit = 5,
   ): Promise<MemorySearchResult[]> {
     try {
+      const start = performance.now()
       log.debug("searching memories", { query, userId, limit })
       const result = await memory.search(query, { userId, limit })
-      log.debug("memory search complete", { resultCount: result.results?.length || 0 })
+      log.debug("memory search complete", {
+        resultCount: result.results?.length || 0,
+        durationMs: durationMs(start),
+      })
       return (result.results || []).map((r) => ({
         id: r.id,
         memory: r.memory,
@@ -169,7 +276,26 @@ export namespace Mem0Integration {
     options: { infer?: boolean } = {},
   ): Promise<MemoryAddResult> {
     try {
-      log.debug("adding to memory", { userId, infer: options.infer !== false })
+      const payloadChars = Array.isArray(messages)
+        ? messages.reduce((sum, msg) => {
+            if (typeof msg === "string") return sum + msg.length
+            try {
+              return sum + JSON.stringify(msg).length
+            } catch {
+              return sum
+            }
+          }, 0)
+        : typeof messages === "string"
+          ? messages.length
+          : JSON.stringify(messages).length
+      const itemCount = Array.isArray(messages) ? messages.length : 1
+      const start = performance.now()
+      log.debug("adding to memory", {
+        userId,
+        infer: options.infer !== false,
+        itemCount,
+        payloadChars,
+      })
       const result = await memory.add(messages, {
         userId,
         infer: options.infer,
@@ -180,7 +306,11 @@ export namespace Mem0Integration {
         score: r.score || 0,
         metadata: r.metadata,
       }))
-      log.info("memory add complete", { count: memories.length })
+      log.info("memory add complete", {
+        count: memories.length,
+        durationMs: durationMs(start),
+        payloadChars,
+      })
       return { results: memories }
     } catch (error) {
       log.error("memory add failed", { error, userId })
