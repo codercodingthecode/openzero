@@ -244,10 +244,10 @@ export namespace Config {
 
     // Apply flag overrides for compaction settings
     if (Flag.OPENZERO_DISABLE_AUTOCOMPACT) {
-      result.compaction = { ...result.compaction, auto: false }
+      result.compaction = { auto: false, ...result.compaction }
     }
     if (Flag.OPENZERO_DISABLE_PRUNE) {
-      result.compaction = { ...result.compaction, prune: false }
+      result.compaction = { auto: false, prune: false, ...result.compaction }
     }
 
     result.plugin = deduplicatePlugins(result.plugin ?? [])
@@ -1172,7 +1172,13 @@ export namespace Config {
         .optional(),
       compaction: z
         .object({
-          auto: z.boolean().optional().describe("Enable automatic compaction when context is full (default: true)"),
+          auto: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe(
+              "Enable automatic compaction when context is full (default: false, uses hierarchical compression instead)",
+            ),
           prune: z.boolean().optional().describe("Enable pruning of old tool outputs (default: true)"),
           reserved: z
             .number()

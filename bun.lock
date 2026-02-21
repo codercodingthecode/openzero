@@ -268,7 +268,6 @@
         "openzero": "./bin/openzero.cjs",
       },
       "dependencies": {
-        "openzero-darwin-arm64": "./dist/openzero-darwin-arm64",
         "@actions/core": "1.11.1",
         "@actions/github": "6.0.1",
         "@agentclientprotocol/sdk": "0.14.1",
@@ -337,6 +336,7 @@
         "minimatch": "10.0.3",
         "open": "10.1.2",
         "opentui-spinner": "0.0.6",
+        "openzero-darwin-arm64": "./dist/openzero-darwin-arm64",
         "partial-json": "0.1.7",
         "remeda": "catalog:",
         "solid-js": "catalog:",

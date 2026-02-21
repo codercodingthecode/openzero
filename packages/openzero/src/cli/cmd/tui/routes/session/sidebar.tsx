@@ -61,6 +61,21 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     }
   })
 
+  const currentQuery = createMemo(() => {
+    const last = messages().findLast((x) => x.role === "assistant" && x.tokens.output > 0) as AssistantMessage
+    if (!last) return
+    const tokens = last.tokens.output + last.tokens.reasoning
+    const price = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 4,
+    }).format(last.cost)
+    return {
+      tokens: tokens.toLocaleString(),
+      price,
+    }
+  })
+
   const directory = useDirectory()
   const kv = useKV()
 
@@ -106,6 +121,11 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
               <text fg={theme.textMuted}>{context()?.tokens ?? 0} tokens</text>
               <text fg={theme.textMuted}>{context()?.percentage ?? 0}% used</text>
               <text fg={theme.textMuted}>{cost()} spent</text>
+              <Show when={currentQuery()}>
+                <text fg={theme.textMuted}>
+                  Current: {currentQuery()!.tokens} tokens ({currentQuery()!.price})
+                </text>
+              </Show>
             </box>
             <Show when={sync.data.config.experimental?.memory?.enabled}>
               <box>
@@ -131,10 +151,10 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                 <Show when={sync.data.memory.status === "error"}>
                   <box flexDirection="row" gap={1}>
                     <text fg={theme.error} flexShrink={0}>
-                      ✕
+                      ⚠
                     </text>
                     <text fg={theme.error} wrapMode="word">
-                      {sync.data.memory.error || "Unknown error"}
+                      <b>ERROR:</b> {sync.data.memory.error || "Unknown error"}
                     </text>
                   </box>
                 </Show>

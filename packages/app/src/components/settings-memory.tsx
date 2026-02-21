@@ -21,18 +21,28 @@ export const SettingsMemory: Component = () => {
     saving: false,
   })
 
+  const embed = (id: string, model: { family?: string; name?: string }) => {
+    const family = model.family?.toLowerCase() ?? ""
+    if (family.includes("embedding")) return true
+    const name = model.name?.toLowerCase() ?? ""
+    if (name.includes("embedding")) return true
+    if (id.toLowerCase().includes("embedding")) return true
+    return false
+  }
+
   // Get available models from connected providers
   const availableModels = createMemo(() => {
     const models: Array<{ value: string; label: string }> = []
 
     providers.connected().forEach((provider) => {
       Object.entries(provider.models).forEach(([modelId, model]) => {
-        if (model.type === "chat") {
-          models.push({
-            value: `${provider.id}/${modelId}`,
-            label: `${provider.name} - ${modelId}`,
-          })
-        }
+        if (embed(modelId, model)) return
+        const output = model.modalities?.output ?? []
+        if (!output.includes("text")) return
+        models.push({
+          value: `${provider.id}/${modelId}`,
+          label: `${provider.name} - ${model.name || modelId}`,
+        })
       })
     })
 
@@ -40,8 +50,20 @@ export const SettingsMemory: Component = () => {
   })
 
   const availableEmbeddingModels = createMemo(() => {
-    // For now, hardcode common embedding models
-    // Could be extended to detect from providers
+    const models: Array<{ value: string; label: string }> = []
+
+    providers.connected().forEach((provider) => {
+      Object.entries(provider.models).forEach(([modelId, model]) => {
+        if (!embed(modelId, model)) return
+        models.push({
+          value: `${provider.id}/${modelId}`,
+          label: `${provider.name} - ${model.name || modelId}`,
+        })
+      })
+    })
+
+    if (models.length > 0) return models
+
     return [
       { value: "openai/text-embedding-3-small", label: "OpenAI - text-embedding-3-small (1536 dims)" },
       { value: "openai/text-embedding-3-large", label: "OpenAI - text-embedding-3-large (3072 dims)" },

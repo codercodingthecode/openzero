@@ -71,6 +71,7 @@ export namespace Session {
       share,
       revert,
       permission: row.permission ?? undefined,
+      history: row.history ?? undefined,
       time: {
         created: row.time_created,
         updated: row.time_updated,
@@ -96,6 +97,7 @@ export namespace Session {
       summary_diffs: info.summary?.diffs,
       revert: info.revert ?? null,
       permission: info.permission,
+      history: info.history,
       time_created: info.time.created,
       time_updated: info.time.updated,
       time_compacting: info.time.compacting,
@@ -135,6 +137,7 @@ export namespace Session {
         .optional(),
       title: z.string(),
       version: z.string(),
+      history: z.string().optional(), // Serialized hierarchical history
       time: z.object({
         created: z.number(),
         updated: z.number(),

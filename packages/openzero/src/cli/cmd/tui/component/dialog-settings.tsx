@@ -14,6 +14,15 @@ export function DialogSettings() {
 
   const memoryConfig = () => (sync.data.config.experimental as any)?.memory
 
+  const isEmbedding = (id: string, info: { name?: string; family?: string }) => {
+    const family = info.family?.toLowerCase() ?? ""
+    if (family.includes("embedding")) return true
+    const name = info.name?.toLowerCase() ?? ""
+    if (name.includes("embedding") || name.includes("embed")) return true
+    if (id.toLowerCase().includes("embedding")) return true
+    return false
+  }
+
   const updateMemoryConfig = async (updates: any) => {
     const current = memoryConfig() || {}
     // Only include valid schema fields - no defaults, user must set models explicitly
@@ -37,7 +46,7 @@ export function DialogSettings() {
       auto_start: current.qdrant?.auto_start ?? true,
     }
 
-    await sdk.client.global.config.update({
+    await sdk.client.config.update({
       config: {
         experimental: {
           ...sync.data.config.experimental,
@@ -66,6 +75,7 @@ export function DialogSettings() {
           provider.models,
           entries(),
           filter(([_, info]) => info.status !== "deprecated"),
+          filter(([modelID, info]) => !isEmbedding(modelID, info)),
           map(([modelID, info]) => ({
             value: `${provider.id}/${modelID}`,
             title: info.name ?? modelID,
@@ -103,9 +113,7 @@ export function DialogSettings() {
           provider.models,
           entries(),
           filter(([modelID, info]) => {
-            // Filter for embedding models
-            const name = (info.name ?? modelID).toLowerCase()
-            return name.includes("embedding") || name.includes("embed")
+            return isEmbedding(modelID, info)
           }),
           map(([modelID, info]) => ({
             value: `${provider.id}/${modelID}`,

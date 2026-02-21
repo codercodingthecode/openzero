@@ -364,30 +364,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         }
 
         case "memory.search.completed": {
+          // Only clear error if this was a successful search (count > 0 or explicitly clearing)
           setStore("memory", {
-            status: "idle",
+            status: store.memory.status === "error" ? "error" : "idle",
             lastSearchCount: event.properties.count,
             lastMemorizeCount: store.memory.lastMemorizeCount,
-            error: null,
-          })
-          break
-        }
-
-        case "memory.memorize.started": {
-          setStore("memory", {
-            status: "memorizing",
-            lastSearchCount: store.memory.lastSearchCount,
-            lastMemorizeCount: 0,
-            error: null,
-          })
-          break
-        }
-
-        case "memory.search.completed": {
-          setStore("memory", {
-            status: "idle",
-            lastSearchCount: event.properties.count,
-            lastMemorizeCount: store.memory.lastMemorizeCount,
+            error: event.properties.count > 0 ? null : store.memory.error,
           })
           break
         }
@@ -402,11 +384,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         }
 
         case "memory.memorize.completed": {
+          // Clear error only on successful memorization
           setStore("memory", {
             status: "idle",
             lastSearchCount: store.memory.lastSearchCount,
             lastMemorizeCount: event.properties.count,
-            error: null,
+            error: event.properties.count > 0 ? null : store.memory.error,
           })
           break
         }

@@ -654,6 +654,30 @@ export namespace SessionPrompt {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
       }
 
+      // Inject hierarchical history if available (Agent Zero-style compression)
+      const { SessionHistory } = await import("./history")
+      const history = session.history ? SessionHistory.deserialize(session.history) : undefined
+      const historyMessages = history ? SessionHistory.getSummaries(history) : []
+      const activeIds = history ? SessionHistory.getActiveMessageIDs(history) : undefined
+
+      // Filter raw messages to only include active uncompressed ones
+      // Always include new messages that haven't been processed by compression yet
+      const rawMsgs = activeIds
+        ? msgs.filter((m, i) => {
+            if (activeIds.has(m.info.id)) return true
+
+            const lastId = history?.lastMessageID
+            if (!lastId) return true // No history yet, keep everything
+
+            const lastProcessedIdx = msgs.findIndex((msg) => msg.info.id === lastId)
+            // If we can't find the last processed message, play it safe and include
+            if (lastProcessedIdx === -1) return true
+
+            // Include if it comes after the last processed message
+            return i > lastProcessedIdx
+          })
+        : msgs
+
       const result = await processor.process({
         user: lastUser,
         agent,
@@ -661,7 +685,8 @@ export namespace SessionPrompt {
         sessionID,
         system,
         messages: [
-          ...MessageV2.toModelMessages(msgs, model),
+          ...historyMessages.map((h) => ({ role: h.role, content: h.content })),
+          ...MessageV2.toModelMessages(rawMsgs, model),
           ...(isLastStep
             ? [
                 {

@@ -409,6 +409,13 @@ export namespace SessionProcessor {
           }
           input.assistantMessage.time.completed = Date.now()
           await Session.updateMessage(input.assistantMessage)
+
+          // Trigger hierarchical compression in background (doesn't block)
+          const { SessionCompression } = await import("./compression")
+          SessionCompression.maybeCompress({ sessionID: input.sessionID, model: input.model }).catch((error) => {
+            log.error("background compression failed", { error, sessionID: input.sessionID })
+          })
+
           if (needsCompaction) return "compact"
           if (blocked) return "stop"
           if (input.assistantMessage.error) return "stop"

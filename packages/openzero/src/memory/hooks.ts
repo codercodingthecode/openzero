@@ -85,9 +85,34 @@ export namespace MemoryHooks {
       // Inject at the end of system prompt
       systemPrompt.push(memoryContext)
     } catch (error) {
-      log.error("failed to search memories", { error })
-      // Emit completed event even on error
-      await Bus.publish(MemorySearchCompleted, { count: 0 })
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const fullError = JSON.stringify(error)
+      log.error("failed to search memories", { error, errorMessage, fullError })
+
+      // Make quota/token errors more visible - check full error object too
+      let displayError = `Memory Search Failed: ${errorMessage}`
+      const searchText = (errorMessage + fullError).toLowerCase()
+
+      if (searchText.includes("quota") || searchText.includes("insufficient_quota")) {
+        displayError = "⚠ QUOTA EXCEEDED (Memory Search)"
+      } else if (
+        searchText.includes("rate_limit") ||
+        searchText.includes("rate limit") ||
+        searchText.includes("ratelimit")
+      ) {
+        displayError = "⚠ RATE LIMIT (Memory Search)"
+      } else if (searchText.includes("context") && searchText.includes("length")) {
+        displayError = "⚠ CONTEXT TOO LONG (Memory Search)"
+      } else if (searchText.includes("401") || searchText.includes("unauthorized")) {
+        displayError = "⚠ AUTH ERROR (Memory Search)"
+      } else if (searchText.includes("429")) {
+        displayError = "⚠ RATE LIMIT 429 (Memory Search)"
+      }
+
+      // Emit error event
+      log.error("emitting memory error", { displayError })
+      await Bus.publish(MemoryError, { error: displayError })
+      // Don't emit completed event - let the error state persist
       log.debug("memory search errored", { durationMs: durationMs(start) })
     }
   }
@@ -128,9 +153,34 @@ export namespace MemoryHooks {
         log.debug("no new memories extracted", { durationMs: durationMs(start) })
       }
     } catch (error) {
-      log.error("failed to save memories", { error })
-      // Emit completed event even on error
-      await Bus.publish(MemoryMemorizeCompleted, { count: 0 })
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const fullError = JSON.stringify(error)
+      log.error("failed to save memories", { error, errorMessage, fullError })
+
+      // Make quota/token errors more visible - check full error object too
+      let displayError = `Memory Save Failed: ${errorMessage}`
+      const searchText = (errorMessage + fullError).toLowerCase()
+
+      if (searchText.includes("quota") || searchText.includes("insufficient_quota")) {
+        displayError = "⚠ QUOTA EXCEEDED (Memory Save)"
+      } else if (
+        searchText.includes("rate_limit") ||
+        searchText.includes("rate limit") ||
+        searchText.includes("ratelimit")
+      ) {
+        displayError = "⚠ RATE LIMIT (Memory Save)"
+      } else if (searchText.includes("context") && searchText.includes("length")) {
+        displayError = "⚠ CONTEXT TOO LONG (Memory Save)"
+      } else if (searchText.includes("401") || searchText.includes("unauthorized")) {
+        displayError = "⚠ AUTH ERROR (Memory Save)"
+      } else if (searchText.includes("429")) {
+        displayError = "⚠ RATE LIMIT 429 (Memory Save)"
+      }
+
+      // Emit error event
+      log.error("emitting memory error", { displayError })
+      await Bus.publish(MemoryError, { error: displayError })
+      // Don't emit completed event - let the error state persist
       log.debug("memory save errored", { durationMs: durationMs(start) })
     }
   }
