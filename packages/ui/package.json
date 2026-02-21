@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-ai/ui",
+  "name": "@openzero/ui",
   "version": "1.2.10",
   "type": "module",
   "license": "MIT",
@@ -41,8 +41,8 @@
   },
   "dependencies": {
     "@kobalte/core": "catalog:",
-    "@opencode-ai/sdk": "workspace:*",
-    "@opencode-ai/util": "workspace:*",
+    "@openzero/sdk": "workspace:*",
+    "@openzero/util": "workspace:*",
     "@pierre/diffs": "catalog:",
     "@shikijs/transformers": "3.9.2",
     "@solid-primitives/bounds": "0.1.3",

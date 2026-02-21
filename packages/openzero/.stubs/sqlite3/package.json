@@ -1,0 +1,6 @@
+{
+  "name": "sqlite3",
+  "version": "99.99.99",
+  "main": "./sqlite3-stub.js",
+  "type": "commonjs"
+}

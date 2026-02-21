@@ -1,5 +1,5 @@
 {
-  "name": "@opencode-ai/desktop",
+  "name": "@openzero/desktop",
   "private": true,
   "version": "1.2.10",
   "type": "module",
@@ -13,8 +13,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@opencode-ai/app": "workspace:*",
-    "@opencode-ai/ui": "workspace:*",
+    "@openzero/app": "workspace:*",
+    "@openzero/ui": "workspace:*",
     "@solid-primitives/i18n": "2.2.1",
     "@solid-primitives/storage": "catalog:",
     "@tauri-apps/api": "^2",
