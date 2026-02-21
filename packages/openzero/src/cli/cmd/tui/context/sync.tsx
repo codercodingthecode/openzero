@@ -73,6 +73,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       formatter: FormatterStatus[]
       vcs: VcsInfo | undefined
       path: Path
+      memory: {
+        status: "idle" | "searching" | "memorizing" | "error"
+        lastSearchCount: number
+        lastMemorizeCount: number
+        error: string | null
+      }
     }>({
       provider_next: {
         all: [],
@@ -100,6 +106,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       formatter: [],
       vcs: undefined,
       path: { state: "", config: "", worktree: "", directory: "" },
+      memory: {
+        status: "idle",
+        lastSearchCount: 0,
+        lastMemorizeCount: 0,
+        error: null,
+      },
     })
 
     const sdk = useSDK()
@@ -338,6 +350,74 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
 
         case "vcs.branch.updated": {
           setStore("vcs", { branch: event.properties.branch })
+          break
+        }
+
+        case "memory.search.started": {
+          setStore("memory", {
+            status: "searching",
+            lastSearchCount: 0,
+            lastMemorizeCount: store.memory.lastMemorizeCount,
+            error: null,
+          })
+          break
+        }
+
+        case "memory.search.completed": {
+          setStore("memory", {
+            status: "idle",
+            lastSearchCount: event.properties.count,
+            lastMemorizeCount: store.memory.lastMemorizeCount,
+            error: null,
+          })
+          break
+        }
+
+        case "memory.memorize.started": {
+          setStore("memory", {
+            status: "memorizing",
+            lastSearchCount: store.memory.lastSearchCount,
+            lastMemorizeCount: 0,
+            error: null,
+          })
+          break
+        }
+
+        case "memory.search.completed": {
+          setStore("memory", {
+            status: "idle",
+            lastSearchCount: event.properties.count,
+            lastMemorizeCount: store.memory.lastMemorizeCount,
+          })
+          break
+        }
+
+        case "memory.memorize.started": {
+          setStore("memory", {
+            status: "memorizing",
+            lastSearchCount: store.memory.lastSearchCount,
+            lastMemorizeCount: 0,
+          })
+          break
+        }
+
+        case "memory.memorize.completed": {
+          setStore("memory", {
+            status: "idle",
+            lastSearchCount: store.memory.lastSearchCount,
+            lastMemorizeCount: event.properties.count,
+            error: null,
+          })
+          break
+        }
+
+        case "memory.error": {
+          setStore("memory", {
+            status: "error",
+            lastSearchCount: 0,
+            lastMemorizeCount: 0,
+            error: event.properties.error,
+          })
           break
         }
       }

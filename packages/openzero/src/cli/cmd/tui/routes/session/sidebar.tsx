@@ -25,6 +25,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     diff: true,
     todo: true,
     lsp: true,
+    memory: true,
   })
 
   // Sort MCP servers alphabetically for consistent display order
@@ -106,6 +107,50 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
               <text fg={theme.textMuted}>{context()?.percentage ?? 0}% used</text>
               <text fg={theme.textMuted}>{cost()} spent</text>
             </box>
+            <Show when={sync.data.config.experimental?.memory?.enabled}>
+              <box>
+                <text fg={theme.text}>
+                  <b>Memory</b>
+                </text>
+                <Show when={sync.data.memory.status === "searching"}>
+                  <box flexDirection="row" gap={1}>
+                    <text fg={theme.warning} flexShrink={0}>
+                      •
+                    </text>
+                    <text fg={theme.textMuted}>Searching...</text>
+                  </box>
+                </Show>
+                <Show when={sync.data.memory.status === "memorizing"}>
+                  <box flexDirection="row" gap={1}>
+                    <text fg={theme.warning} flexShrink={0}>
+                      •
+                    </text>
+                    <text fg={theme.textMuted}>Memorizing...</text>
+                  </box>
+                </Show>
+                <Show when={sync.data.memory.status === "error"}>
+                  <box flexDirection="row" gap={1}>
+                    <text fg={theme.error} flexShrink={0}>
+                      ✕
+                    </text>
+                    <text fg={theme.error} wrapMode="word">
+                      {sync.data.memory.error || "Unknown error"}
+                    </text>
+                  </box>
+                </Show>
+                <Show when={sync.data.memory.status === "idle"}>
+                  <Show when={sync.data.memory.lastSearchCount > 0}>
+                    <text fg={theme.textMuted}>Recalled {sync.data.memory.lastSearchCount} memories</text>
+                  </Show>
+                  <Show when={sync.data.memory.lastMemorizeCount > 0}>
+                    <text fg={theme.textMuted}>Saved {sync.data.memory.lastMemorizeCount} memories</text>
+                  </Show>
+                  <Show when={sync.data.memory.lastSearchCount === 0 && sync.data.memory.lastMemorizeCount === 0}>
+                    <text fg={theme.textMuted}>Idle</text>
+                  </Show>
+                </Show>
+              </box>
+            </Show>
             <Show when={mcpEntries().length > 0}>
               <box>
                 <box

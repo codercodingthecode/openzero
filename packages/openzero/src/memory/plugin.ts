@@ -6,6 +6,7 @@ import { Mem0Integration } from "./mem0"
 import { MemoryHooks } from "./hooks"
 import { MemoryTools } from "./tools"
 import { Session } from "../session"
+import { Auth } from "../auth"
 
 export const MemoryPlugin: Plugin = async (input) => {
   const log = Log.create({ service: "memory-plugin" })
@@ -46,8 +47,26 @@ export const MemoryPlugin: Plugin = async (input) => {
       throw err
     })
 
+    // Get API key from Auth system based on the provider used
+    const embeddingProvider = memoryConfig.embedding_model?.split("/")[0] || "openai"
+    const auth = await Auth.all()
+    let apiKey: string | undefined
+
+    // Try to find the API key for the embedding provider
+    for (const [key, value] of Object.entries(auth)) {
+      if (key === embeddingProvider && value.type === "api") {
+        apiKey = value.key
+        break
+      }
+    }
+
+    if (!apiKey) {
+      log.error(`No API key found for ${embeddingProvider}. Configure it with: openzero auth add ${embeddingProvider}`)
+      throw new Error(`No API key found for ${embeddingProvider}. Please run: openzero auth add ${embeddingProvider}`)
+    }
+
     // Initialize Mem0
-    const memory = await Mem0Integration.create(memoryConfig, input.directory).catch((err) => {
+    const memory = await Mem0Integration.create(memoryConfig, input.directory, apiKey).catch((err) => {
       log.error("failed to initialize mem0", { error: err })
       throw err
     })
@@ -138,7 +157,13 @@ export const MemoryPlugin: Plugin = async (input) => {
 
     return hooks
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
     log.error("memory plugin initialization failed", { error })
+
+    // Emit error event so TUI can show it
+    const { MemoryError } = await import("./hooks")
+    await Bus.publish(MemoryError, { error: errorMessage })
+
     // Return empty hooks on error - don't crash OpenCode
     return {}
   }

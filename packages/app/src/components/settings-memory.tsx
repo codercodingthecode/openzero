@@ -2,7 +2,7 @@ import { Component, createMemo, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Button } from "@openzero/ui/button"
 import { Icon } from "@openzero/ui/icon"
-import { Input } from "@openzero/ui/input"
+import { TextField } from "@openzero/ui/text-field"
 import { Select } from "@openzero/ui/select"
 import { Switch } from "@openzero/ui/switch"
 import { showToast } from "@openzero/ui/toast"
@@ -108,8 +108,10 @@ export const SettingsMemory: Component = () => {
               LLM used for extracting and managing memories (choose a cheap/fast model)
             </p>
             <Select
-              value={config().model || ""}
-              onChange={(value) => updateMemoryConfig({ model: value })}
+              current={availableModels().find((m) => m.value === config().model)}
+              value={(x) => x.value}
+              label={(x) => x.label}
+              onSelect={(item) => updateMemoryConfig({ model: item?.value })}
               placeholder="Select a model..."
               options={availableModels()}
             />
@@ -126,8 +128,10 @@ export const SettingsMemory: Component = () => {
             <label class="text-13-medium">Embedding Model</label>
             <p class="text-12-regular text-text-weak mb-2">Model used for vector embeddings (semantic search)</p>
             <Select
-              value={config().embedding_model || ""}
-              onChange={(value) => updateMemoryConfig({ embedding_model: value })}
+              current={availableEmbeddingModels().find((m) => m.value === config().embedding_model)}
+              value={(x) => x.value}
+              label={(x) => x.label}
+              onSelect={(item) => updateMemoryConfig({ embedding_model: item?.value })}
               placeholder="Select an embedding model..."
               options={availableEmbeddingModels()}
             />
@@ -159,32 +163,28 @@ export const SettingsMemory: Component = () => {
             </div>
 
             <Show when={!config().qdrant?.auto_start}>
-              <div class="flex flex-col gap-2">
-                <label class="text-13-medium">Qdrant Host</label>
-                <Input
-                  value={config().qdrant?.host || "localhost"}
-                  onChange={(e) =>
-                    updateMemoryConfig({
-                      qdrant: { ...config().qdrant, host: e.currentTarget.value },
-                    })
-                  }
-                  placeholder="localhost"
-                />
-              </div>
+              <TextField
+                label="Qdrant Host"
+                value={config().qdrant?.host || "localhost"}
+                onChange={(value) =>
+                  updateMemoryConfig({
+                    qdrant: { ...config().qdrant, host: value },
+                  })
+                }
+                placeholder="localhost"
+              />
 
-              <div class="flex flex-col gap-2">
-                <label class="text-13-medium">Qdrant Port</label>
-                <Input
-                  type="number"
-                  value={config().qdrant?.port || 6333}
-                  onChange={(e) =>
-                    updateMemoryConfig({
-                      qdrant: { ...config().qdrant, port: parseInt(e.currentTarget.value) },
-                    })
-                  }
-                  placeholder="6333"
-                />
-              </div>
+              <TextField
+                label="Qdrant Port"
+                type="number"
+                value={String(config().qdrant?.port || 6333)}
+                onChange={(value) =>
+                  updateMemoryConfig({
+                    qdrant: { ...config().qdrant, port: parseInt(value) },
+                  })
+                }
+                placeholder="6333"
+              />
             </Show>
           </div>
 
@@ -208,40 +208,34 @@ export const SettingsMemory: Component = () => {
             </div>
 
             <Show when={config().recall?.enabled ?? true}>
-              <div class="flex flex-col gap-2">
-                <label class="text-13-medium">Recall Interval</label>
-                <p class="text-12-regular text-text-weak mb-2">
-                  Recall memories every N turns (1 = every turn, 3 = every 3rd turn)
-                </p>
-                <Input
-                  type="number"
-                  value={config().recall?.interval || 3}
-                  onChange={(e) =>
-                    updateMemoryConfig({
-                      recall: { ...config().recall, interval: parseInt(e.currentTarget.value) },
-                    })
-                  }
-                  placeholder="3"
-                  min={1}
-                />
-              </div>
+              <TextField
+                label="Recall Interval"
+                description="Recall memories every N turns (1 = every turn, 3 = every 3rd turn)"
+                type="number"
+                value={String(config().recall?.interval || 3)}
+                onChange={(value) =>
+                  updateMemoryConfig({
+                    recall: { ...config().recall, interval: parseInt(value) },
+                  })
+                }
+                placeholder="3"
+                min={1}
+              />
 
-              <div class="flex flex-col gap-2">
-                <label class="text-13-medium">Max Results</label>
-                <p class="text-12-regular text-text-weak mb-2">Maximum number of memories to recall per turn</p>
-                <Input
-                  type="number"
-                  value={config().recall?.max_results || 5}
-                  onChange={(e) =>
-                    updateMemoryConfig({
-                      recall: { ...config().recall, max_results: parseInt(e.currentTarget.value) },
-                    })
-                  }
-                  placeholder="5"
-                  min={1}
-                  max={20}
-                />
-              </div>
+              <TextField
+                label="Max Results"
+                description="Maximum number of memories to recall per turn"
+                type="number"
+                value={String(config().recall?.max_results || 5)}
+                onChange={(value) =>
+                  updateMemoryConfig({
+                    recall: { ...config().recall, max_results: parseInt(value) },
+                  })
+                }
+                placeholder="5"
+                min={1}
+                max={20}
+              />
             </Show>
           </div>
 
@@ -267,26 +261,22 @@ export const SettingsMemory: Component = () => {
             </div>
 
             <Show when={config().auto_memorize?.enabled ?? true}>
-              <div class="flex flex-col gap-2">
-                <label class="text-13-medium">Idle Timeout (seconds)</label>
-                <p class="text-12-regular text-text-weak mb-2">
-                  Wait this many seconds after conversation ends before memorizing
-                </p>
-                <Input
-                  type="number"
-                  value={config().auto_memorize?.idle_timeout || 60}
-                  onChange={(e) =>
-                    updateMemoryConfig({
-                      auto_memorize: {
-                        ...config().auto_memorize,
-                        idle_timeout: parseInt(e.currentTarget.value),
-                      },
-                    })
-                  }
-                  placeholder="60"
-                  min={5}
-                />
-              </div>
+              <TextField
+                label="Idle Timeout (seconds)"
+                description="Wait this many seconds after conversation ends before memorizing"
+                type="number"
+                value={String(config().auto_memorize?.idle_timeout || 60)}
+                onChange={(value) =>
+                  updateMemoryConfig({
+                    auto_memorize: {
+                      ...config().auto_memorize,
+                      idle_timeout: parseInt(value),
+                    },
+                  })
+                }
+                placeholder="60"
+                min={5}
+              />
             </Show>
           </div>
 

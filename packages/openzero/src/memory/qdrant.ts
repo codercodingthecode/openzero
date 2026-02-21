@@ -9,7 +9,7 @@ import { existsSync } from "fs"
 export namespace QdrantManager {
   const log = Log.create({ service: "qdrant" })
 
-  const QDRANT_VERSION = "v1.12.5"
+  const QDRANT_VERSION = "v1.17.0"
   const DOWNLOAD_BASE = "https://github.com/qdrant/qdrant/releases/download"
 
   let process: ChildProcess | null = null
@@ -22,35 +22,35 @@ export namespace QdrantManager {
   }
 
   function getBinaryPath(): string {
-    return path.join(Global.Path.home, "bin", "qdrant")
+    return path.join(Global.Path.bin, "qdrant")
   }
 
   function getDataPath(): string {
-    return path.join(Global.Path.home, "memory", "qdrant-data")
+    return path.join(Global.Path.data, "memory", "qdrant-data")
   }
 
   function getConfigPath(): string {
-    return path.join(Global.Path.home, "memory", "qdrant-config.yaml")
+    return path.join(Global.Path.data, "memory", "qdrant-config.yaml")
   }
 
-  function getPlatformBinaryName(): string {
+  function getPlatformArchiveName(): string {
     const platform = os.platform()
     const arch = os.arch()
 
     if (platform === "darwin") {
-      return arch === "arm64" ? "qdrant-darwin-arm64" : "qdrant-darwin-x64"
+      return arch === "arm64" ? "qdrant-aarch64-apple-darwin.tar.gz" : "qdrant-x86_64-apple-darwin.tar.gz"
     } else if (platform === "linux") {
-      return arch === "arm64" ? "qdrant-linux-arm64" : "qdrant-linux-x64"
+      return arch === "arm64" ? "qdrant-aarch64-unknown-linux-musl.tar.gz" : "qdrant-x86_64-unknown-linux-musl.tar.gz"
     } else if (platform === "win32") {
-      return "qdrant-windows-x64.exe"
+      return "qdrant-x86_64-pc-windows-msvc.zip"
     }
 
     throw new Error(`Unsupported platform: ${platform}-${arch}`)
   }
 
   function getDownloadUrl(): string {
-    const binaryName = getPlatformBinaryName()
-    return `${DOWNLOAD_BASE}/${QDRANT_VERSION}/${binaryName}`
+    const archiveName = getPlatformArchiveName()
+    return `${DOWNLOAD_BASE}/${QDRANT_VERSION}/${archiveName}`
   }
 
   async function downloadBinary(): Promise<void> {
@@ -67,6 +67,9 @@ export namespace QdrantManager {
     }
 
     const url = getDownloadUrl()
+    const archiveName = getPlatformArchiveName()
+    const tempArchive = path.join(binDir, archiveName)
+
     log.info("downloading qdrant binary", { url, target: binaryPath })
 
     const response = await fetch(url)
@@ -74,10 +77,22 @@ export namespace QdrantManager {
       throw new Error(`Failed to download Qdrant: ${response.status} ${response.statusText}`)
     }
 
+    // Download to temp file
     const buffer = await response.arrayBuffer()
-    await fs.writeFile(binaryPath, new Uint8Array(buffer))
-    await fs.chmod(binaryPath, 0o755)
+    await fs.writeFile(tempArchive, new Uint8Array(buffer))
 
+    // Extract archive
+    const platform = os.platform()
+    if (platform === "win32") {
+      // TODO: Handle zip extraction for Windows
+      throw new Error("Windows Qdrant extraction not implemented yet")
+    } else {
+      // Extract tar.gz using Bun shell
+      await Bun.$`tar -xzf ${tempArchive} -C ${binDir}`.quiet()
+      await fs.unlink(tempArchive)
+    }
+
+    await fs.chmod(binaryPath, 0o755)
     log.info("qdrant binary downloaded successfully", { path: binaryPath })
   }
 

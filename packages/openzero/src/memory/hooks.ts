@@ -2,6 +2,40 @@ import type { Memory } from "mem0ai/oss"
 import { Log } from "../util/log"
 import { Mem0Integration } from "./mem0"
 import type { MemoryConfig } from "./config"
+import { Bus } from "../bus"
+import { BusEvent } from "../bus/bus-event"
+import z from "zod"
+
+// Define memory events
+export const MemorySearchStarted = BusEvent.define(
+  "memory.search.started",
+  z.object({
+    query: z.string(),
+  }),
+)
+
+export const MemorySearchCompleted = BusEvent.define(
+  "memory.search.completed",
+  z.object({
+    count: z.number(),
+  }),
+)
+
+export const MemoryMemorizeStarted = BusEvent.define("memory.memorize.started", z.object({}))
+
+export const MemoryMemorizeCompleted = BusEvent.define(
+  "memory.memorize.completed",
+  z.object({
+    count: z.number(),
+  }),
+)
+
+export const MemoryError = BusEvent.define(
+  "memory.error",
+  z.object({
+    error: z.string(),
+  }),
+)
 
 export namespace MemoryHooks {
   const log = Log.create({ service: "memory-hooks" })
@@ -19,7 +53,14 @@ export namespace MemoryHooks {
   ): Promise<void> {
     try {
       const maxResults = config?.max_results || 5
+
+      // Emit search started event
+      await Bus.publish(MemorySearchStarted, { query: userQuery })
+
       const memories = await Mem0Integration.search(memory, userQuery, userId, maxResults)
+
+      // Emit search completed event
+      await Bus.publish(MemorySearchCompleted, { count: memories.length })
 
       if (memories.length === 0) {
         log.debug("no relevant memories found")
@@ -41,6 +82,8 @@ export namespace MemoryHooks {
       systemPrompt.push(memoryContext)
     } catch (error) {
       log.error("failed to search memories", { error })
+      // Emit completed event even on error
+      await Bus.publish(MemorySearchCompleted, { count: 0 })
     }
   }
 
@@ -57,6 +100,9 @@ export namespace MemoryHooks {
     try {
       log.debug("memorizing conversation")
 
+      // Emit memorize started event
+      await Bus.publish(MemoryMemorizeStarted, {})
+
       // Let mem0's LLM extract facts from the conversation
       const messages = [
         { role: "user", content: userMessage },
@@ -65,13 +111,20 @@ export namespace MemoryHooks {
 
       const result = await Mem0Integration.add(memory, messages, userId, { infer: true })
 
-      if (result.results.length > 0) {
-        log.info("saved memories", { count: result.results.length })
+      const count = result.results.length
+
+      // Emit memorize completed event
+      await Bus.publish(MemoryMemorizeCompleted, { count })
+
+      if (count > 0) {
+        log.info("saved memories", { count })
       } else {
         log.debug("no new memories extracted")
       }
     } catch (error) {
       log.error("failed to save memories", { error })
+      // Emit completed event even on error
+      await Bus.publish(MemoryMemorizeCompleted, { count: 0 })
     }
   }
 }

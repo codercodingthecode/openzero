@@ -16,22 +16,32 @@ export function DialogSettings() {
 
   const updateMemoryConfig = async (updates: any) => {
     const current = memoryConfig() || {}
+    // Only include valid schema fields - no defaults, user must set models explicitly
+    const config: any = {
+      enabled: updates.enabled !== undefined ? updates.enabled : current.enabled,
+      max_results: updates.max_results !== undefined ? updates.max_results : current.max_results,
+    }
+
+    // Only include model/embedding if they exist
+    if (updates.model || current.model) {
+      config.model = updates.model || current.model
+    }
+    if (updates.embedding_model || current.embedding_model) {
+      config.embedding_model = updates.embedding_model || current.embedding_model
+    }
+
+    // Always include qdrant config
+    config.qdrant = {
+      host: current.qdrant?.host || "localhost",
+      port: current.qdrant?.port || 6333,
+      auto_start: current.qdrant?.auto_start ?? true,
+    }
+
     await sdk.client.global.config.update({
       config: {
         experimental: {
           ...sync.data.config.experimental,
-          memory: {
-            enabled: current.enabled || false,
-            model: current.model || "openai/gpt-4o-mini",
-            embedding_model: current.embedding_model || "openai/text-embedding-3-small",
-            max_results: current.max_results || 5,
-            qdrant: {
-              host: current.qdrant?.host || "localhost",
-              port: current.qdrant?.port || 6333,
-              auto_start: current.qdrant?.auto_start ?? true,
-            },
-            ...updates,
-          },
+          memory: config,
         } as any,
       },
     })

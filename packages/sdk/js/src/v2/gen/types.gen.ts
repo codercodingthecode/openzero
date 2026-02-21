@@ -941,6 +941,34 @@ export type EventWorktreeFailed = {
   }
 }
 
+export type EventMemorySearchStarted = {
+  type: "memory.search.started"
+  properties: {
+    query: string
+  }
+}
+
+export type EventMemorySearchCompleted = {
+  type: "memory.search.completed"
+  properties: {
+    count: number
+  }
+}
+
+export type EventMemoryMemorizeStarted = {
+  type: "memory.memorize.started"
+  properties: {
+    [key: string]: unknown
+  }
+}
+
+export type EventMemoryMemorizeCompleted = {
+  type: "memory.memorize.completed"
+  properties: {
+    count: number
+  }
+}
+
 export type Event =
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
@@ -985,6 +1013,10 @@ export type Event =
   | EventPtyDeleted
   | EventWorktreeReady
   | EventWorktreeFailed
+  | EventMemorySearchStarted
+  | EventMemorySearchCompleted
+  | EventMemoryMemorizeStarted
+  | EventMemoryMemorizeCompleted
 
 export type GlobalEvent = {
   directory: string
@@ -1887,6 +1919,29 @@ export type Config = {
      * Timeout in milliseconds for model context protocol (MCP) requests
      */
     mcp_timeout?: number
+    memory?: {
+      enabled?: boolean
+      /**
+       * LLM model for memory operations (e.g., 'openai/gpt-4o-mini')
+       */
+      model?: string
+      /**
+       * Embedding model for vector search (e.g., 'openai/text-embedding-3-small')
+       */
+      embedding_model?: string
+      qdrant?: {
+        host?: string
+        port?: number
+        /**
+         * Auto-download and start Qdrant server
+         */
+        auto_start?: boolean
+      }
+      /**
+       * Maximum number of memories to retrieve per search
+       */
+      max_results?: number
+    }
   }
 }
 
