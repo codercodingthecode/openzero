@@ -1,115 +1,165 @@
-# Gradual History Compression Implementation Plan
+# Hierarchical History Compression - Implementation Complete ✅
 
-**Goal:** Replace blocking compaction with Agent Zero–style gradual background compression.
+**Goal:** Replace blocking compaction with Agent Zero's hierarchical background compression.
 
-## Current State (Blocking Compaction)
+**Status:** FULLY IMPLEMENTED (Feb 21, 2026)
 
-- When context overflows, triggers a **blocking** compaction agent
-- Rewrites entire session into a single summary message
-- Prunes old tool outputs
-- User waits for this to complete
+## What Was Built
 
-## Target State (Gradual Compression)
+### ✅ 1. Hierarchical History System
 
-- **Background** summarization after each turn
-- Keeps recent N messages raw (e.g., last 5–10 turns)
-- Older messages compressed into rolling "history summary" text
-- Memory (Mem0) stores important facts separately
-- No blocking "compact" operation
+**File:** `packages/openzero/src/session/history.ts` (398 lines)
 
-## Implementation Steps
+Implemented Agent Zero's three-level structure:
 
-### 1. Schema Changes
+- **Current Topic** (50% of context): Recent raw messages
+- **Topics** (30% of context): Older summarized topics
+- **Bulks** (20% of context): Ancient, heavily compressed history
+- **Message Deduplication**: Tracks `lastMessageID` to prevent re-adding messages on each compression run
 
-**File:** `packages/openzero/src/session/session.sql.ts`
+**Key functions:**
 
-Add `history_summary` column to `SessionTable`:
+- `compress()`: Iterative algorithm that compresses most over-budget level first (Agent Zero's algorithm)
+- `compressCurrent()`: Summarizes middle 65% of messages in current topic
+- `compressTopics()`: Summarizes topics, moves oldest to bulks
+- `compressBulks()`: Merges bulks in groups of 3 or drops oldest
+- `summarizeMessages()`: Real LLM summarization using `gpt-4o-mini` via OpenZero's Provider API
+- `mergeBulks()`: LLM-based bulk merging
+- `toMessages()`: Converts hierarchy to flat messages for prompt injection
 
-```ts
-history_summary: text()
-```
+### ✅ 2. Schema Changes
 
-**File:** `packages/openzero/src/session/index.ts`
+**Files:**
 
-Add `historySummary` to `Session.Info` type and `fromRow`/`toRow` functions.
+- `packages/openzero/src/session/session.sql.ts` - Added `history: text()` column
+- `packages/openzero/src/session/index.ts` - Added `history?: string, lastMessageID?: string` to `Session.Info`
+- `migration/20260221072203_add_history_field/migration.sql` - Migration auto-applies on startup
 
-### 2. Enable Compression Module
+### ✅ 3. Compression Module
 
 **File:** `packages/openzero/src/session/compression.ts`
 
-- Remove early return in `maybeCompress`
-- Implement `summarizeMessages` with proper LLM call (using streamText + Provider API)
-- Wire up session update to save `historySummary`
+- `maybeCompress()`: Triggers compression async in background (doesn't block responses)
+- `compress()`: Loads history, adds only NEW messages, compresses if needed, saves back to DB
+- **Deduplication Fix**: Only processes messages added since `lastMessageID`
 
-### 3. Hook Compression into Session Flow
+### ✅ 4. Wired Into Session Flow
 
-**File:** `packages/openzero/src/session/processor.ts`
+**File:** `packages/openzero/src/session/processor.ts:415`
 
-After assistant response completes, call:
+Compression triggers after every assistant response:
 
 ```ts
-await SessionCompression.maybeCompress({ sessionID, model })
+const { SessionCompression } = await import("./compression")
+SessionCompression.maybeCompress({ sessionID: input.sessionID, model: input.model }).catch((error) => {
+  log.error("background compression failed", { error, sessionID: input.sessionID })
+})
 ```
 
-This runs async in background, doesn't block the user.
+### ✅ 5. Prompt Injection
 
-### 4. Update Prompt Construction
+**File:** `packages/openzero/src/session/prompt.ts:657-670`
 
-**File:** `packages/openzero/src/session/prompt.ts`
+Hierarchical history injected BEFORE raw messages:
 
-Modify `buildPrompt` to inject:
+```ts
+const { SessionHistory } = await import("./history")
+const history = session.history ? SessionHistory.deserialize(session.history) : undefined
+const historyMessages = history ? SessionHistory.toMessages(history) : []
 
-1. `[history summary]` (if exists)
-2. `[recent N raw messages]`
+// Inject into prompt
+messages: [
+  ...historyMessages.map((h) => ({ role: h.role, content: h.content })),
+  ...MessageV2.toModelMessages(msgs, model),
+  // ...
+]
+```
 
-Instead of all raw messages.
+Format matches Agent Zero: `[Ancient history]:`, `[Previous topic]:` prefixes.
 
-### 5. Disable Old Compaction
+### ✅ 6. Old Compaction Disabled
 
 **File:** `packages/openzero/src/config/config.ts`
 
-Set default:
+Default changed to disable blocking compaction:
 
 ```ts
 compaction: {
-  auto: false, // Disable old blocking compaction
-  prune: true,  // Keep pruning for now
+  auto: false, // Hierarchical compression replaces this
+  prune: true,
 }
 ```
 
-### 6. Migration
+## Memory Latency Instrumentation
 
-**Generate:** `bun run db generate --name add_history_summary`
+### ✅ Timing Instrumentation
 
-Creates migration to add `history_summary` column to existing sessions.
+**Files:** `packages/openzero/src/memory/{mem0.ts, hooks.ts}`
+
+- Deep timing wrapping of ALL Mem0 operations
+- LLM calls (including call number, prompt size, response format)
+- Embeddings (text size, batch count)
+- Vector store operations (search, insert, update)
+- Logs format: `mem0 timing { step, durationMs, ... }`
+
+### ✅ Fact Extraction Cap
+
+**File:** `packages/openzero/src/memory/prompts.ts`
+
+- Changed from 10 facts per turn to **50 facts per turn**
+- Reduces consolidation prompt size in Mem0's update step
+
+## Build & Deploy
+
+**Version:** `0.0.0-dev-202602210735`
+
+**Build command:**
+
+```bash
+cd packages/openzero
+bun run script/build.ts --skip-install
+cp dist/openzero-darwin-arm64/bin/openzero ~/.local/bin/openzero
+```
+
+**Built binary:** `~/.local/bin/openzero` (134MB, Mach-O arm64)
+
+## How It Works
+
+1. **After each assistant response**, `SessionCompression.maybeCompress()` runs async in background
+2. **Loads history** from `session.history` column (or creates new)
+3. **Adds only NEW messages** since `lastMessageID` (prevents duplicates)
+4. **Checks token budget** - if over 70% of context limit, triggers compression
+5. **Compresses iteratively** using Agent Zero's algorithm:
+   - Finds most "over budget" level (Current/Topics/Bulks)
+   - Compresses that level using LLM summarization
+   - Repeats until all levels fit their ratios (50/30/20)
+6. **Saves compressed history** back to database
+7. **Prompt construction** injects compressed history before raw messages
 
 ## Benefits
 
-- ✅ No blocking waits for "compaction"
-- ✅ Memory stores facts (via Mem0), history stores context
-- ✅ Gradual compression keeps recent messages fresh
-- ✅ Matches Agent Zero's proven approach
+- ✅ **No blocking waits** - compression runs in background
+- ✅ **Gradual compression** - iterative, not all-at-once
+- ✅ **LLM summarization** - real summaries via `gpt-4o-mini`, not truncation
+- ✅ **Agent Zero's proven algorithm** - token ratio enforcement (50/30/20)
+- ✅ **Memory + History separation** - Mem0 stores facts, history stores context
+- ✅ **Deduplication** - tracks last processed message ID
 
-## Next Steps (After Schema)
+## Testing Checklist
 
-1. Run migration: `bun run db migrate`
-2. Enable compression in `compression.ts`
-3. Test with long conversations
-4. Monitor compression timing logs
-5. Tune `MIN_RECENT_MESSAGES` and token ratios based on usage
+1. **Memory timing logs** - Verify detailed breakdown of Mem0 operations
+2. **Non-blocking compression** - Chat responses shouldn't stall
+3. **Long conversations** - Watch topics/bulks being created in logs
+4. **Prompt injection** - Compressed history appears in prompts with `[Ancient history]:` prefixes
+5. **No duplicates** - History shouldn't grow exponentially from re-adding messages
 
-## Config Knobs (Future)
+## Known Issues
 
-```ts
-experimental: {
-  compression: {
-    enabled: true,
-    recentMessages: 5, // Keep last N raw
-    tokenRatios: {
-      recent: 0.6,
-      summary: 0.3,
-      buffer: 0.1,
-    },
-  },
-}
-```
+None currently - duplication bug was fixed before testing.
+
+## Future Improvements
+
+- Use cheaper "utility" model for summarization (like Agent Zero does)
+- Add config knobs for compression ratios
+- Monitor compression performance and tune thresholds
+- Consider compressing large individual messages

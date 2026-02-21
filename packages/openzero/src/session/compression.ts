@@ -25,14 +25,9 @@ export namespace SessionCompression {
     const contextLimit = input.model.limit.context
     if (contextLimit === 0) return // Model has no limit
 
-    // Cap the compression trigger at 40k tokens so we don't let context grow infinitely
-    // for models with massive context windows (like Gemini 3.1's 2M limit)
-    // 40k limit * 0.7 budget = 28k max history tokens (keeps things snappy)
-    const effectiveLimit = Math.min(contextLimit, 40_000)
-
     // Run compression in background - don't block the response
     Promise.resolve()
-      .then(() => compress({ sessionID: input.sessionID, contextLimit: effectiveLimit }))
+      .then(() => compress({ sessionID: input.sessionID, contextLimit }))
       .catch((error) => {
         log.error("background compression failed", { error, sessionID: input.sessionID })
       })

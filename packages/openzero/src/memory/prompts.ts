@@ -36,6 +36,6 @@ Each fact should be self-contained and useful on its own.
 Today's date is {current_date}.
 
 Return a JSON object with a "facts" key containing an array of fact strings.
-Limit the list to at most 500 facts; choose the highest-value, most reusable facts first.
+// No hard cap - extract as many high-value facts as needed; choose the highest-value, most reusable facts first.
 If nothing worth remembering was discussed, return {"facts": []}.`
 }

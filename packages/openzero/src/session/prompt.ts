@@ -658,25 +658,25 @@ export namespace SessionPrompt {
       const { SessionHistory } = await import("./history")
       const history = session.history ? SessionHistory.deserialize(session.history) : undefined
       const historyMessages = history ? SessionHistory.getSummaries(history) : []
-      const activeIds = history ? SessionHistory.getActiveMessageIDs(history) : undefined
 
-      // Filter raw messages to only include active uncompressed ones
-      // Always include new messages that haven't been processed by compression yet
-      const rawMsgs = activeIds
-        ? msgs.filter((m, i) => {
-            if (activeIds.has(m.info.id)) return true
-
-            const lastId = history?.lastMessageID
-            if (!lastId) return true // No history yet, keep everything
-
-            const lastProcessedIdx = msgs.findIndex((msg) => msg.info.id === lastId)
-            // If we can't find the last processed message, play it safe and include
-            if (lastProcessedIdx === -1) return true
-
-            // Include if it comes after the last processed message
-            return i > lastProcessedIdx
-          })
-        : msgs
+      // Keep only the last 3 user+assistant exchange pairs as raw messages.
+      // Memory covers older context, so we don't need to keep more than that.
+      const KEEP_EXCHANGES = 3
+      const rawMsgs = (() => {
+        // Group msgs into exchanges (each user msg + following assistant msgs = 1 exchange)
+        const exchanges: MessageV2.WithParts[][] = []
+        let current: MessageV2.WithParts[] = []
+        for (const msg of msgs) {
+          if (msg.info.role === "user" && current.length > 0) {
+            exchanges.push(current)
+            current = []
+          }
+          current.push(msg)
+        }
+        if (current.length > 0) exchanges.push(current)
+        // Take only the last N exchanges
+        return exchanges.slice(-KEEP_EXCHANGES).flat()
+      })()
 
       const result = await processor.process({
         user: lastUser,

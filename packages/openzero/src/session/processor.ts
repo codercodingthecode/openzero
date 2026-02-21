@@ -247,6 +247,12 @@ export namespace SessionProcessor {
                     usage: value.usage,
                     metadata: value.providerMetadata,
                   })
+                  log.info("TOKEN USAGE", {
+                    inputTokens: value.usage.inputTokens,
+                    outputTokens: value.usage.outputTokens,
+                    totalTokens: (value.usage.inputTokens ?? 0) + (value.usage.outputTokens ?? 0),
+                    model: input.model.id,
+                  })
                   input.assistantMessage.finish = value.finishReason
                   input.assistantMessage.cost += usage.cost
                   input.assistantMessage.tokens = usage.tokens
