@@ -6,6 +6,9 @@ import { Bus } from "../bus"
 import { BusEvent } from "../bus/bus-event"
 import z from "zod"
 import { performance } from "node:perf_hooks"
+import { MemorySchema } from "./schema"
+import { extractStructuredFacts } from "./extraction"
+import { Config } from "../config/config"
 
 // Define memory events
 export const MemorySearchStarted = BusEvent.define(
@@ -73,12 +76,30 @@ export namespace MemoryHooks {
 
       log.info("injecting memories into system prompt", { count: memories.length, durationMs: durationMs(start) })
 
-      // Build memory context
+      // Build memory context - format structured memories for AI consumption
+      const formattedMemories = memories.map((m, i) => {
+        // Try to parse the memory as structured data
+        let memoryData: MemorySchema.AnyMemory = m.memory
+        try {
+          // If memory is a JSON string, parse it
+          if (typeof m.memory === "string" && m.memory.trim().startsWith("{")) {
+            memoryData = JSON.parse(m.memory)
+          }
+        } catch {
+          // If parsing fails, use as plain string
+          memoryData = m.memory
+        }
+
+        // Format using the schema formatter
+        const formatted = MemorySchema.format(memoryData)
+        return `${i + 1}. ${formatted}`
+      })
+
       const memoryContext = [
         "# Relevant Past Context",
         "The following information was learned from previous conversations:",
         "",
-        ...memories.map((m, i) => `${i + 1}. ${m.memory}`),
+        ...formattedMemories,
         "",
       ].join("\n")
 
@@ -126,6 +147,7 @@ export namespace MemoryHooks {
     userId: string,
     userMessage: string,
     assistantMessage: string,
+    config: MemoryConfig.Info | undefined,
   ): Promise<void> {
     const start = performance.now()
     try {
@@ -134,23 +156,104 @@ export namespace MemoryHooks {
       // Emit memorize started event
       await Bus.publish(MemoryMemorizeStarted, {})
 
-      // Let mem0's LLM extract facts from the conversation
+      // Format messages for extraction
       const messages = [
         { role: "user", content: userMessage },
         { role: "assistant", content: assistantMessage },
       ]
 
-      const result = await Mem0Integration.add(memory, messages, userId, { infer: true })
+      // STEP 1: Extract structured facts ourselves using custom LLM call
+      const modelString = config?.model || "openai/gpt-4o-mini"
+      // Parse model string: "provider/model" -> { provider, model }
+      const parts = modelString.split("/")
+      const memoryModel =
+        parts.length >= 2
+          ? { provider: parts[0], model: parts.slice(1).join("/") }
+          : { provider: "openai", model: modelString }
 
-      const count = result.results.length
+      const facts = await extractStructuredFacts(messages, memoryModel)
+
+      if (facts.length === 0) {
+        log.debug("no facts extracted from conversation", { durationMs: durationMs(start) })
+        await Bus.publish(MemoryMemorizeCompleted, { count: 0 })
+        return
+      }
+
+      log.debug("extracted structured facts", {
+        count: facts.length,
+        types: facts.map((f) => f.type),
+      })
+
+      // STEP 2: Store each fact with structured metadata (infer: false)
+      const results = []
+      for (const fact of facts) {
+        // Use summary as the searchable text
+        const text = fact.summary
+
+        // Put all structured fields in metadata (except summary which is the main text)
+        const metadata: Record<string, any> = {
+          type: fact.type,
+          details: fact.details,
+          keywords: fact.keywords,
+          context: fact.context,
+        }
+
+        // Add type-specific fields
+        switch (fact.type) {
+          case "workflow":
+            if (fact.command) metadata.command = fact.command
+            if (fact.trigger) metadata.trigger = fact.trigger
+            if (fact.dependencies) metadata.dependencies = fact.dependencies
+            break
+          case "preference":
+            if (fact.category) metadata.category = fact.category
+            if (fact.examples) metadata.examples = fact.examples
+            break
+          case "bug_fix":
+            metadata.symptom = fact.symptom
+            metadata.solution = fact.solution
+            if (fact.rootCause) metadata.rootCause = fact.rootCause
+            if (fact.preventionTips) metadata.preventionTips = fact.preventionTips
+            break
+          case "architecture":
+            if (fact.decision) metadata.decision = fact.decision
+            if (fact.rationale) metadata.rationale = fact.rationale
+            if (fact.alternatives) metadata.alternatives = fact.alternatives
+            if (fact.tradeoffs) metadata.tradeoffs = fact.tradeoffs
+            break
+          case "config":
+            metadata.setting = fact.setting
+            if (fact.value) metadata.value = fact.value
+            if (fact.location) metadata.location = fact.location
+            if (fact.purpose) metadata.purpose = fact.purpose
+            break
+          case "fact":
+            // Fact type just uses base fields (summary, details, etc.)
+            break
+        }
+
+        // Call mem0 with infer: false so it doesn't re-extract
+        const result = await Mem0Integration.add(memory, text, userId, {
+          infer: false,
+          metadata,
+        })
+
+        results.push(...result.results)
+      }
+
+      const count = results.length
 
       // Emit memorize completed event
       await Bus.publish(MemoryMemorizeCompleted, { count })
 
       if (count > 0) {
-        log.info("saved memories", { count, durationMs: durationMs(start) })
+        log.info("saved structured memories", {
+          count,
+          types: facts.map((f) => f.type),
+          durationMs: durationMs(start),
+        })
       } else {
-        log.debug("no new memories extracted", { durationMs: durationMs(start) })
+        log.debug("no memories saved after deduplication", { durationMs: durationMs(start) })
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)

@@ -2,6 +2,7 @@ import { Memory } from "mem0ai/oss"
 import type { MemoryConfig } from "./config"
 import { Log } from "../util/log"
 import { MemoryPrompts } from "./prompts"
+import { MemorySchema } from "./schema"
 import crypto from "crypto"
 import { performance } from "node:perf_hooks"
 import { generateText, embed, embedMany } from "ai"
@@ -97,9 +98,63 @@ export namespace Mem0Integration {
 
     if (m.vectorStore?.insert) {
       const original = m.vectorStore.insert.bind(m.vectorStore)
-      m.vectorStore.insert = wrapTiming("vectorStore.insert", original, (args) => ({
-        count: Array.isArray(args[0]) ? args[0].length : 0,
-      }))
+      m.vectorStore.insert = async (...args: any[]) => {
+        const start = performance.now()
+
+        // Transform memory payloads to preserve structured format
+        // Mem0 passes an array of memory objects to insert
+        if (Array.isArray(args[0])) {
+          args[0] = args[0].map((memoryPoint: any) => {
+            // memoryPoint has shape: { id, vector, payload: { data, userId, hash, createdAt, ... } }
+            if (memoryPoint.payload && typeof memoryPoint.payload.data === "string") {
+              const data = memoryPoint.payload.data
+
+              // Try to parse as JSON - if it's structured memory, enhance the payload
+              try {
+                if (data.trim().startsWith("{")) {
+                  const parsed = JSON.parse(data)
+
+                  // Check if it's a structured memory (has type + summary fields)
+                  if (MemorySchema.isStructured(parsed)) {
+                    log.debug("preserving structured memory format", {
+                      type: parsed.type,
+                      summary: parsed.summary?.substring(0, 100),
+                    })
+
+                    // Store the structured data in payload for rich retrieval
+                    return {
+                      ...memoryPoint,
+                      payload: {
+                        ...memoryPoint.payload,
+                        // Keep original data for backward compat
+                        data,
+                        // Add structured fields to payload for filtering/retrieval
+                        memory_type: parsed.type,
+                        // Spread all structured fields into payload
+                        ...parsed,
+                      },
+                    }
+                  }
+                }
+              } catch (e) {
+                // Not JSON, keep as-is (legacy plain-text memory)
+              }
+            }
+
+            return memoryPoint
+          })
+        }
+
+        const result = await original(...args)
+
+        log.info("mem0 timing", {
+          step: "vectorStore.insert",
+          durationMs: durationMs(start),
+          count: Array.isArray(args[0]) ? args[0].length : 0,
+        })
+
+        return result
+      }
     }
 
     if (m.vectorStore?.update) {
@@ -288,7 +343,13 @@ export namespace Mem0Integration {
           })
 
           if (responseFormat?.type === "json_object") {
-            return stripCodeBlocks(result.text)
+            const cleaned = stripCodeBlocks(result.text)
+            log.debug("mem0 LLM extraction response", {
+              rawLength: result.text.length,
+              cleanedLength: cleaned.length,
+              preview: cleaned.substring(0, 500),
+            })
+            return cleaned
           }
 
           if (tools && tools.length > 0) {
@@ -389,13 +450,20 @@ export namespace Mem0Integration {
   }
 
   /**
-   * Add messages to memory (with LLM extraction)
+   * Add messages to memory (with or without LLM extraction)
+   *
+   * When infer=true (default), mem0 handles extraction with its internal pipeline.
+   * When infer=false, we assume the caller has already extracted structured data
+   * and is passing it directly with metadata.
+   *
+   * For custom extraction with structured metadata, use:
+   *   add(memory, summaryText, userId, { infer: false, metadata: {...structured fields} })
    */
   export async function add(
     memory: Memory,
     messages: string | any[],
     userId: string,
-    options: { infer?: boolean } = {},
+    options: { infer?: boolean; metadata?: Record<string, any> } = {},
   ): Promise<MemoryAddResult> {
     try {
       const payloadChars = Array.isArray(messages)
@@ -417,10 +485,12 @@ export namespace Mem0Integration {
         infer: options.infer !== false,
         itemCount,
         payloadChars,
+        hasMetadata: !!options.metadata,
       })
       const result = await memory.add(messages, {
         userId,
         infer: options.infer,
+        metadata: options.metadata,
       })
       const memories = (result.results || []).map((r) => ({
         id: r.id,
@@ -428,8 +498,22 @@ export namespace Mem0Integration {
         score: r.score || 0,
         metadata: r.metadata,
       }))
+
+      // Log structured vs legacy memory format breakdown
+      const structuredCount = memories.filter((m) => {
+        try {
+          if (typeof m.memory === "string" && m.memory.trim().startsWith("{")) {
+            const parsed = JSON.parse(m.memory)
+            return MemorySchema.isStructured(parsed)
+          }
+        } catch {}
+        return false
+      }).length
+
       log.info("memory add complete", {
         count: memories.length,
+        structured: structuredCount,
+        legacy: memories.length - structuredCount,
         durationMs: durationMs(start),
         payloadChars,
       })

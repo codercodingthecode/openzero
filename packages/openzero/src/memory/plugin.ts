@@ -143,7 +143,7 @@ export const MemoryPlugin: Plugin = async (input) => {
             return
           }
 
-          await MemoryHooks.afterAssistantMessage(memory, projectUserId, userMessage, assistantText)
+          await MemoryHooks.afterAssistantMessage(memory, projectUserId, userMessage, assistantText, memoryConfig)
         } catch (error) {
           log.error("failed to save conversation", { error })
         }

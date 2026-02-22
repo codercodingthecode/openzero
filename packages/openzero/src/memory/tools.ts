@@ -2,6 +2,7 @@ import z from "zod"
 import { tool } from "@openzero/plugin"
 import type { Memory } from "mem0ai/oss"
 import { Mem0Integration } from "./mem0"
+import { MemorySchema } from "./schema"
 import { Log } from "../util/log"
 
 export namespace MemoryTools {
@@ -79,12 +80,36 @@ export namespace MemoryTools {
             return "No memories found matching your query"
           }
 
-          return (
-            `Found ${memories.length} memories:\n\n` +
-            memories
-              .map((m, idx) => `${idx + 1}. [ID: ${m.id}] ${m.memory} (score: ${m.score?.toFixed(2) || "N/A"})`)
-              .join("\n")
-          )
+          // Format memories for display (handle both structured metadata and legacy)
+          const formattedResults = memories.map((m, idx) => {
+            // Priority 1: Use structured metadata if available
+            if (m.metadata && typeof m.metadata === "object" && "type" in m.metadata) {
+              const structuredMemory: MemorySchema.AnyMemory = {
+                type: m.metadata.type,
+                summary: m.memory, // The main text
+                ...m.metadata, // All other structured fields
+              } as any
+
+              const formatted = MemorySchema.format(structuredMemory)
+              return `${idx + 1}. [ID: ${m.id}] ${formatted}\n   Score: ${m.score?.toFixed(2) || "N/A"}`
+            }
+
+            // Priority 2: Try to parse memory text as structured JSON
+            let memoryData: MemorySchema.AnyMemory = m.memory
+            try {
+              if (typeof m.memory === "string" && m.memory.trim().startsWith("{")) {
+                memoryData = JSON.parse(m.memory)
+              }
+            } catch {
+              // Use as plain string if parsing fails
+              memoryData = m.memory
+            }
+
+            const formatted = MemorySchema.format(memoryData)
+            return `${idx + 1}. [ID: ${m.id}] ${formatted}\n   Score: ${m.score?.toFixed(2) || "N/A"}`
+          })
+
+          return `Found ${memories.length} memories:\n\n` + formattedResults.join("\n\n")
         } catch (error) {
           log.error("memory_search failed", { error })
           return `Error searching memory: ${error instanceof Error ? error.message : String(error)}`
