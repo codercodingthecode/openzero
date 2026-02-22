@@ -1,13 +1,12 @@
 import { test, expect, describe } from "bun:test"
 import path from "path"
-import { unlink } from "fs/promises"
 
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { Provider } from "../../src/provider/provider"
 import { Env } from "../../src/env"
-import { Global } from "../../src/global"
 import { Filesystem } from "../../src/util/filesystem"
+import { Auth } from "../../src/auth"
 
 test("Bedrock: config region takes precedence over AWS_REGION env var", async () => {
   await using tmp = await tmpdir({
@@ -66,7 +65,7 @@ test("Bedrock: falls back to AWS_REGION env var when no config region", async ()
   })
 })
 
-test("Bedrock: loads when bearer token from auth.json is present", async () => {
+test("Bedrock: loads when bearer token is present", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Filesystem.write(
@@ -85,27 +84,13 @@ test("Bedrock: loads when bearer token from auth.json is present", async () => {
     },
   })
 
-  const authPath = path.join(Global.Path.data, "auth.json")
-
-  // Save original auth.json if it exists
-  let originalAuth: string | undefined
-  try {
-    originalAuth = await Filesystem.readText(authPath)
-  } catch {
-    // File doesn't exist, that's fine
-  }
+  const originalAuth = await Auth.get("amazon-bedrock")
 
   try {
-    // Write test auth.json
-    await Filesystem.write(
-      authPath,
-      JSON.stringify({
-        "amazon-bedrock": {
-          type: "api",
-          key: "test-bearer-token",
-        },
-      }),
-    )
+    await Auth.set("amazon-bedrock", {
+      type: "api",
+      key: "test-bearer-token",
+    })
 
     await Instance.provide({
       directory: tmp.path,
@@ -121,15 +106,10 @@ test("Bedrock: loads when bearer token from auth.json is present", async () => {
       },
     })
   } finally {
-    // Restore original or delete
-    if (originalAuth !== undefined) {
-      await Filesystem.write(authPath, originalAuth)
+    if (originalAuth) {
+      await Auth.set("amazon-bedrock", originalAuth)
     } else {
-      try {
-        await unlink(authPath)
-      } catch {
-        // Ignore errors if file doesn't exist
-      }
+      await Auth.remove("amazon-bedrock")
     }
   }
 })

@@ -28,6 +28,27 @@ export namespace State {
     }
   }
 
+  export function clear(key: string, init: () => any) {
+    const entries = recordsByKey.get(key)
+    if (!entries) return
+    entries.delete(init)
+    log.info("cleared cached state", { key, init: typeof init === "function" ? init.name : String(init) })
+  }
+
+  export function clearAll(init: () => any) {
+    let cleared = 0
+    for (const [key, entries] of recordsByKey) {
+      if (entries.has(init)) {
+        entries.delete(init)
+        cleared++
+      }
+    }
+    log.info("cleared cached state for all instances", {
+      init: typeof init === "function" ? init.name : String(init),
+      count: cleared,
+    })
+  }
+
   export async function dispose(key: string) {
     const entries = recordsByKey.get(key)
     if (!entries) return

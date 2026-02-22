@@ -5,7 +5,7 @@ import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { Provider } from "../../src/provider/provider"
 import { Env } from "../../src/env"
-import { Global } from "../../src/global"
+import { Auth } from "../../src/auth"
 
 test("GitLab Duo: loads provider with API key from environment", async () => {
   await using tmp = await tmpdir({
@@ -63,7 +63,7 @@ test("GitLab Duo: config instanceUrl option sets baseURL", async () => {
   })
 })
 
-test("GitLab Duo: loads with OAuth token from auth.json", async () => {
+test("GitLab Duo: loads with OAuth token", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Bun.write(
@@ -75,32 +75,35 @@ test("GitLab Duo: loads with OAuth token from auth.json", async () => {
     },
   })
 
-  const authPath = path.join(Global.Path.data, "auth.json")
-  await Bun.write(
-    authPath,
-    JSON.stringify({
-      gitlab: {
-        type: "oauth",
-        access: "test-access-token",
-        refresh: "test-refresh-token",
-        expires: Date.now() + 3600000,
-      },
-    }),
-  )
+  const originalAuth = await Auth.get("gitlab")
+  try {
+    await Auth.set("gitlab", {
+      type: "oauth",
+      access: "test-access-token",
+      refresh: "test-refresh-token",
+      expires: Date.now() + 3600000,
+    })
 
-  await Instance.provide({
-    directory: tmp.path,
-    init: async () => {
-      Env.set("GITLAB_TOKEN", "")
-    },
-    fn: async () => {
-      const providers = await Provider.list()
-      expect(providers["gitlab"]).toBeDefined()
-    },
-  })
+    await Instance.provide({
+      directory: tmp.path,
+      init: async () => {
+        Env.set("GITLAB_TOKEN", "")
+      },
+      fn: async () => {
+        const providers = await Provider.list()
+        expect(providers["gitlab"]).toBeDefined()
+      },
+    })
+  } finally {
+    if (originalAuth) {
+      await Auth.set("gitlab", originalAuth)
+    } else {
+      await Auth.remove("gitlab")
+    }
+  }
 })
 
-test("GitLab Duo: loads with Personal Access Token from auth.json", async () => {
+test("GitLab Duo: loads with Personal Access Token", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
       await Bun.write(
@@ -112,28 +115,31 @@ test("GitLab Duo: loads with Personal Access Token from auth.json", async () => 
     },
   })
 
-  const authPath2 = path.join(Global.Path.data, "auth.json")
-  await Bun.write(
-    authPath2,
-    JSON.stringify({
-      gitlab: {
-        type: "api",
-        key: "glpat-test-pat-token",
-      },
-    }),
-  )
+  const originalAuth = await Auth.get("gitlab")
+  try {
+    await Auth.set("gitlab", {
+      type: "api",
+      key: "glpat-test-pat-token",
+    })
 
-  await Instance.provide({
-    directory: tmp.path,
-    init: async () => {
-      Env.set("GITLAB_TOKEN", "")
-    },
-    fn: async () => {
-      const providers = await Provider.list()
-      expect(providers["gitlab"]).toBeDefined()
-      expect(providers["gitlab"].key).toBe("glpat-test-pat-token")
-    },
-  })
+    await Instance.provide({
+      directory: tmp.path,
+      init: async () => {
+        Env.set("GITLAB_TOKEN", "")
+      },
+      fn: async () => {
+        const providers = await Provider.list()
+        expect(providers["gitlab"]).toBeDefined()
+        expect(providers["gitlab"].key).toBe("glpat-test-pat-token")
+      },
+    })
+  } finally {
+    if (originalAuth) {
+      await Auth.set("gitlab", originalAuth)
+    } else {
+      await Auth.remove("gitlab")
+    }
+  }
 })
 
 test("GitLab Duo: supports self-hosted instance configuration", async () => {

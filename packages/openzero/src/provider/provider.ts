@@ -11,7 +11,6 @@ import { ModelsDev } from "./models"
 import { NamedError } from "@openzero/util/error"
 import { Auth } from "../auth"
 import { Env } from "../env"
-import { Instance } from "../project/instance"
 import { Flag } from "../flag/flag"
 import { iife } from "@/util/iife"
 import { Global } from "../global"
@@ -754,7 +753,10 @@ export namespace Provider {
     }
   }
 
-  const state = Instance.state(async () => {
+  const sdk = new Map<number, SDK>()
+  const languages = new Map<string, LanguageModelV2>()
+
+  const loadProviders = async () => {
     using _ = log.time("state")
     const config = await Config.get()
     const modelsDev = await ModelsDev.get()
@@ -770,13 +772,9 @@ export namespace Provider {
     }
 
     const providers: { [providerID: string]: Info } = {}
-    const languages = new Map<string, LanguageModelV2>()
     const modelLoaders: {
       [providerID: string]: CustomModelLoader
     } = {}
-    const sdk = new Map<number, SDK>()
-
-    log.info("init")
 
     const configProviders = Object.entries(config.provider ?? {})
 
@@ -1027,24 +1025,30 @@ export namespace Provider {
     }
 
     return {
-      models: languages,
       providers,
-      sdk,
       modelLoaders,
     }
-  })
-
-  export async function list() {
-    return state().then((state) => state.providers)
   }
 
-  async function getSDK(model: Model) {
+  export async function list() {
+    return loadProviders().then((state) => state.providers)
+  }
+
+  async function getSDK(model: Model, provider?: Info) {
     try {
       using _ = log.time("getSDK", {
         providerID: model.providerID,
       })
-      const s = await state()
-      const provider = s.providers[model.providerID]
+      if (!provider) {
+        const s = await loadProviders()
+        provider = s.providers[model.providerID]
+      }
+      if (!provider) {
+        throw new ModelNotFoundError({
+          providerID: model.providerID,
+          modelID: model.id,
+        })
+      }
       const options = { ...provider.options }
 
       if (model.providerID === "google-vertex" && !model.api.npm.includes("@ai-sdk/openai-compatible")) {
@@ -1065,7 +1069,7 @@ export namespace Provider {
         }
 
       const key = Bun.hash.xxHash32(JSON.stringify({ providerID: model.providerID, npm: model.api.npm, options }))
-      const existing = s.sdk.get(key)
+      const existing = sdk.get(key)
       if (existing) return existing
 
       const customFetch = options["fetch"]
@@ -1117,7 +1121,7 @@ export namespace Provider {
           name: model.providerID,
           ...options,
         })
-        s.sdk.set(key, loaded)
+        sdk.set(key, loaded)
         return loaded as SDK
       }
 
@@ -1136,7 +1140,7 @@ export namespace Provider {
         name: model.providerID,
         ...options,
       })
-      s.sdk.set(key, loaded)
+      sdk.set(key, loaded)
       return loaded as SDK
     } catch (e) {
       throw new InitError({ providerID: model.providerID }, { cause: e })
@@ -1144,11 +1148,11 @@ export namespace Provider {
   }
 
   export async function getProvider(providerID: string) {
-    return state().then((s) => s.providers[providerID])
+    return loadProviders().then((s) => s.providers[providerID])
   }
 
   export async function getModel(providerID: string, modelID: string) {
-    const s = await state()
+    const s = await loadProviders()
     const provider = s.providers[providerID]
     if (!provider) {
       const availableProviders = Object.keys(s.providers)
@@ -1168,18 +1172,18 @@ export namespace Provider {
   }
 
   export async function getLanguage(model: Model): Promise<LanguageModelV2> {
-    const s = await state()
+    const s = await loadProviders()
     const key = `${model.providerID}/${model.id}`
-    if (s.models.has(key)) return s.models.get(key)!
+    if (languages.has(key)) return languages.get(key)!
 
     const provider = s.providers[model.providerID]
-    const sdk = await getSDK(model)
+    const sdk = await getSDK(model, provider)
 
     try {
       const language = s.modelLoaders[model.providerID]
         ? await s.modelLoaders[model.providerID](sdk, model.api.id, provider.options)
         : sdk.languageModel(model.api.id)
-      s.models.set(key, language)
+      languages.set(key, language)
       return language
     } catch (e) {
       if (e instanceof NoSuchModelError)
@@ -1195,7 +1199,8 @@ export namespace Provider {
   }
 
   export async function getEmbedding(model: Model) {
-    const sdk = await getSDK(model)
+    const provider = await loadProviders().then((s) => s.providers[model.providerID])
+    const sdk = await getSDK(model, provider)
 
     try {
       return sdk.textEmbeddingModel(model.api.id)
@@ -1213,7 +1218,7 @@ export namespace Provider {
   }
 
   export async function closest(providerID: string, query: string[]) {
-    const s = await state()
+    const s = await loadProviders()
     const provider = s.providers[providerID]
     if (!provider) return undefined
     for (const item of query) {
@@ -1235,7 +1240,8 @@ export namespace Provider {
       return getModel(parsed.providerID, parsed.modelID)
     }
 
-    const provider = await state().then((state) => state.providers[providerID])
+    const s = await loadProviders()
+    const provider = s.providers[providerID]
     if (provider) {
       let priority = [
         "claude-haiku-4-5",
@@ -1285,7 +1291,7 @@ export namespace Provider {
     }
 
     // Check if opencode provider is available before using it
-    const opencodeProvider = await state().then((state) => state.providers["opencode"])
+    const opencodeProvider = s.providers["opencode"]
     if (opencodeProvider && opencodeProvider.models["gpt-5-nano"]) {
       return getModel("opencode", "gpt-5-nano")
     }

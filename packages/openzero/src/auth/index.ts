@@ -2,6 +2,9 @@ import path from "path"
 import { Global } from "../global"
 import z from "zod"
 import { Filesystem } from "../util/filesystem"
+import { Database, eq, isNotNull } from "../storage/db"
+import { ProviderTable } from "../provider/registry.sql"
+import { unlink } from "fs/promises"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
@@ -37,18 +40,59 @@ export namespace Auth {
 
   const filepath = path.join(Global.Path.data, "auth.json")
 
+  async function migrateLegacyAuth() {
+    const legacy = await Filesystem.readJson<Record<string, unknown>>(filepath).catch(() => undefined)
+    if (!legacy) return
+    const entries = Object.entries(legacy).flatMap(([key, value]) => {
+      const parsed = Info.safeParse(value)
+      if (!parsed.success) return []
+      return [{ id: key, info: parsed.data }]
+    })
+
+    if (entries.length === 0) return
+
+    const updatedAt = Date.now()
+    Database.transaction((db) => {
+      for (const entry of entries) {
+        const apiKey = entry.info.type === "api" ? entry.info.key : null
+        db.insert(ProviderTable)
+          .values({
+            id: entry.id,
+            name: entry.id,
+            env: [],
+            enabled: true,
+            last_updated: updatedAt,
+            auth: entry.info as unknown as Record<string, any>,
+            api_key: apiKey,
+          })
+          .onConflictDoUpdate({
+            target: ProviderTable.id,
+            set: {
+              auth: entry.info as unknown as Record<string, any>,
+              api_key: apiKey,
+              last_updated: updatedAt,
+            },
+          })
+          .run()
+      }
+    })
+
+    await unlink(filepath).catch(() => {})
+  }
+
   export async function get(providerID: string) {
     const auth = await all()
     return auth[providerID]
   }
 
   export async function all(): Promise<Record<string, Info>> {
-    const data = await Filesystem.readJson<Record<string, unknown>>(filepath).catch(() => ({}))
-    return Object.entries(data).reduce(
-      (acc, [key, value]) => {
-        const parsed = Info.safeParse(value)
+    await migrateLegacyAuth()
+    const rows = Database.use((db) => db.select().from(ProviderTable).where(isNotNull(ProviderTable.auth)).all())
+    return rows.reduce(
+      (acc, row) => {
+        const parsed = Info.safeParse(row.auth)
         if (!parsed.success) return acc
-        acc[key] = parsed.data
+        acc[row.id] = parsed.data
         return acc
       },
       {} as Record<string, Info>,
@@ -56,13 +100,37 @@ export namespace Auth {
   }
 
   export async function set(key: string, info: Info) {
-    const data = await all()
-    await Filesystem.writeJson(filepath, { ...data, [key]: info }, 0o600)
+    const updatedAt = Date.now()
+    const apiKey = info.type === "api" ? info.key : null
+    Database.use((db) => {
+      db.insert(ProviderTable)
+        .values({
+          id: key,
+          name: key,
+          env: [],
+          enabled: true,
+          last_updated: updatedAt,
+          auth: info as unknown as Record<string, any>,
+          api_key: apiKey,
+        })
+        .onConflictDoUpdate({
+          target: ProviderTable.id,
+          set: {
+            auth: info as unknown as Record<string, any>,
+            api_key: apiKey,
+            last_updated: updatedAt,
+          },
+        })
+        .run()
+    })
   }
 
   export async function remove(key: string) {
-    const data = await all()
-    delete data[key]
-    await Filesystem.writeJson(filepath, data, 0o600)
+    Database.use((db) => {
+      db.update(ProviderTable)
+        .set({ auth: null, api_key: null, last_updated: Date.now() })
+        .where(eq(ProviderTable.id, key))
+        .run()
+    })
   }
 }

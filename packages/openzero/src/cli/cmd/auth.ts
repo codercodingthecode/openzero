@@ -4,10 +4,9 @@ import * as prompts from "@clack/prompts"
 import { UI } from "../ui"
 import { ModelsDev } from "../../provider/models"
 import { map, pipe, sortBy, values } from "remeda"
-import path from "path"
 import os from "os"
 import { Config } from "../../config/config"
-import { Global } from "../../global"
+import { Database } from "../../storage/db"
 import { Plugin } from "../../plugin"
 import { Instance } from "../../project/instance"
 import type { Hooks } from "@openzero/plugin"
@@ -205,7 +204,7 @@ export const AuthListCommand = cmd({
   describe: "list providers",
   async handler() {
     UI.empty()
-    const authPath = path.join(Global.Path.data, "auth.json")
+    const authPath = Database.Path
     const homedir = os.homedir()
     const displayPath = authPath.startsWith(homedir) ? authPath.replace(homedir, "~") : authPath
     prompts.intro(`Credentials ${UI.Style.TEXT_DIM}${displayPath}`)
