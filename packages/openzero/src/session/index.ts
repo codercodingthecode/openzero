@@ -72,6 +72,7 @@ export namespace Session {
       revert,
       permission: row.permission ?? undefined,
       history: row.history ?? undefined,
+      state_record: row.state_record ?? undefined,
       time: {
         created: row.time_created,
         updated: row.time_updated,
@@ -98,6 +99,7 @@ export namespace Session {
       revert: info.revert ?? null,
       permission: info.permission,
       history: info.history,
+      state_record: info.state_record,
       time_created: info.time.created,
       time_updated: info.time.updated,
       time_compacting: info.time.compacting,
@@ -138,6 +140,7 @@ export namespace Session {
       title: z.string(),
       version: z.string(),
       history: z.string().optional(), // Serialized hierarchical history
+      state_record: z.string().optional(), // Serialized session state record
       time: z.object({
         created: z.number(),
         updated: z.number(),

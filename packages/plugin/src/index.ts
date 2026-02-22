@@ -228,6 +228,14 @@ export interface Hooks {
     output: { text: string },
   ) => Promise<void>
   /**
+   * Called once after the assistant fully completes a turn (all steps, tool calls, and text parts done).
+   * Fires regardless of whether the turn contained text, tool calls, or both.
+   */
+  "experimental.assistant.complete"?: (
+    input: { sessionID: string; messageID: string },
+    output: Record<string, never>,
+  ) => Promise<void>
+  /**
    * Modify tool definitions (description and parameters) sent to LLM
    */
   "tool.definition"?: (input: { toolID: string }, output: { description: string; parameters: any }) => Promise<void>

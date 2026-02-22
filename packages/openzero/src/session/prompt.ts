@@ -654,6 +654,13 @@ export namespace SessionPrompt {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
       }
 
+      // Inject session state record if available (ephemeral task context)
+      const { SessionState } = await import("./state")
+      const stateRecord = session.state_record ? SessionState.deserialize(session.state_record) : undefined
+      if (stateRecord && SessionState.hasContent(stateRecord)) {
+        system.push(SessionState.toPrompt(stateRecord))
+      }
+
       // Inject hierarchical history if available (Agent Zero-style compression)
       const { SessionHistory } = await import("./history")
       const history = session.history ? SessionHistory.deserialize(session.history) : undefined

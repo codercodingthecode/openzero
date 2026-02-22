@@ -416,11 +416,21 @@ export namespace SessionProcessor {
           input.assistantMessage.time.completed = Date.now()
           await Session.updateMessage(input.assistantMessage)
 
+          await Plugin.trigger(
+            "experimental.assistant.complete",
+            { sessionID: input.sessionID, messageID: input.assistantMessage.id },
+            {},
+          )
+
           // Trigger hierarchical compression in background (doesn't block)
           const { SessionCompression } = await import("./compression")
           SessionCompression.maybeCompress({ sessionID: input.sessionID, model: input.model }).catch((error) => {
             log.error("background compression failed", { error, sessionID: input.sessionID })
           })
+
+          // Trigger session state record update in background (doesn't block)
+          const { SessionStateUpdate } = await import("./state-update")
+          SessionStateUpdate.maybeUpdate({ sessionID: input.sessionID, providerID: input.model.providerID })
 
           if (needsCompaction) return "compact"
           if (blocked) return "stop"

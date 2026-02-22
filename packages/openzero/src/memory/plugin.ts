@@ -6,6 +6,7 @@ import { Mem0Integration } from "./mem0"
 import { MemoryHooks, MemoryError } from "./hooks"
 import { MemoryTools } from "./tools"
 import { Session } from "../session"
+import { MessageV2 } from "../session/message-v2"
 import { Auth } from "../auth"
 import { Bus } from "../bus"
 
@@ -85,15 +86,14 @@ export const MemoryPlugin: Plugin = async (input) => {
 
     log.info("memory system initialized successfully", { projectUserId })
 
-    // Track conversations for memorization
-    const conversationTracker = new Map<string, { userMessage: string; assistantMessage: string }>()
+    // Track user messages per session for memorization
+    const userMessages = new Map<string, string>()
 
     // Return hooks
     const hooks: Hooks = {
       // Hook: Capture user message
       "chat.message": async (hookInput, output) => {
         try {
-          // Extract text from user message
           const userText = output.parts
             .filter((p) => p.type === "text")
             .map((p) => (p as any).text)
@@ -101,10 +101,7 @@ export const MemoryPlugin: Plugin = async (input) => {
 
           if (userText && hookInput.sessionID) {
             log.debug("tracking user message for memory", { sessionID: hookInput.sessionID, chars: userText.length })
-            conversationTracker.set(hookInput.sessionID, {
-              userMessage: userText,
-              assistantMessage: "",
-            })
+            userMessages.set(hookInput.sessionID, userText)
           } else {
             log.warn("skipping user message tracking", {
               sessionID: hookInput.sessionID,
@@ -123,48 +120,42 @@ export const MemoryPlugin: Plugin = async (input) => {
         if (!hookInput.sessionID) return
 
         try {
-          const conversation = conversationTracker.get(hookInput.sessionID)
-          if (!conversation || !conversation.userMessage) return
+          const userMessage = userMessages.get(hookInput.sessionID)
+          if (!userMessage) return
 
-          // Search and inject memories
-          await MemoryHooks.beforeUserMessage(
-            memory,
-            projectUserId,
-            conversation.userMessage,
-            output.system,
-            memoryConfig,
-          )
+          await MemoryHooks.beforeUserMessage(memory, projectUserId, userMessage, output.system, memoryConfig)
         } catch (error) {
           log.error("failed to inject memories", { error })
         }
       },
 
-      // Hook: After assistant responds, save the conversation
-      "experimental.text.complete": async (hookInput, output) => {
+      // Hook: After assistant fully completes a turn (all steps + tool calls done), save the conversation
+      "experimental.assistant.complete": async (hookInput) => {
         try {
-          const conversation = conversationTracker.get(hookInput.sessionID)
-          if (!conversation || !conversation.userMessage) {
-            log.warn("text.complete fired but no tracked user message found", {
+          const userMessage = userMessages.get(hookInput.sessionID)
+          if (!userMessage) {
+            log.warn("assistant.complete fired but no tracked user message found", {
               sessionID: hookInput.sessionID,
-              hasEntry: !!conversation,
-              trackerSize: conversationTracker.size,
             })
             return
           }
 
-          // Update assistant message
-          conversation.assistantMessage = output.text
+          // Read all text parts from the completed assistant message
+          const parts = await MessageV2.parts(hookInput.messageID)
+          const assistantText = parts
+            .filter((p) => p.type === "text")
+            .map((p) => (p as MessageV2.TextPart).text)
+            .join("\n")
 
-          // Save to memory
-          await MemoryHooks.afterAssistantMessage(
-            memory,
-            projectUserId,
-            conversation.userMessage,
-            conversation.assistantMessage,
-          )
+          // Clean up regardless of whether we save
+          userMessages.delete(hookInput.sessionID)
 
-          // Clean up
-          conversationTracker.delete(hookInput.sessionID)
+          if (!assistantText) {
+            log.debug("assistant turn had no text parts, skipping memorization")
+            return
+          }
+
+          await MemoryHooks.afterAssistantMessage(memory, projectUserId, userMessage, assistantText)
         } catch (error) {
           log.error("failed to save conversation", { error })
         }

@@ -28,6 +28,7 @@ export const SessionTable = sqliteTable(
     revert: text({ mode: "json" }).$type<{ messageID: string; partID?: string; snapshot?: string; diff?: string }>(),
     permission: text({ mode: "json" }).$type<PermissionNext.Ruleset>(),
     history: text(), // Hierarchical history (Agent Zero-style compression)
+    state_record: text(), // Session state record (active task, decisions, progress, blockers, next steps)
     ...Timestamps,
     time_compacting: integer(),
     time_archived: integer(),
