@@ -60,20 +60,8 @@ export const MemoryPlugin: Plugin = async (input) => {
     const embedEntry = embedProvider
       ? Object.entries(auth).find(([k, v]) => k === embedProvider && v.type === "api")
       : undefined
-    const llmApiKey = llmEntry?.[1].type === "api" ? llmEntry[1].key : undefined
-    const embedApiKey = embedEntry?.[1].type === "api" ? embedEntry[1].key : undefined
-
-    if (!llmApiKey) {
-      const msg = `No API key found for ${llmProvider}. Run: openzero auth add ${llmProvider}`
-      log.error(msg)
-      throw new Error(msg)
-    }
-
-    if (!embedApiKey) {
-      const msg = `No API key found for ${embedProvider}. Run: openzero auth add ${embedProvider}`
-      log.error(msg)
-      throw new Error(msg)
-    }
+    const llmApiKey = llmEntry?.[1].type === "api" ? llmEntry[1].key : "dummy"
+    const embedApiKey = embedEntry?.[1].type === "api" ? embedEntry[1].key : "dummy"
 
     // Initialize Mem0
     const memory = await Mem0Integration.create(memoryConfig, input.directory, llmApiKey, embedApiKey).catch((err) => {

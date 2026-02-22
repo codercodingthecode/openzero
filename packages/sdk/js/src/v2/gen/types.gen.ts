@@ -822,6 +822,7 @@ export type Session = {
   title: string
   version: string
   history?: string
+  state_record?: string
   time: {
     created: number
     updated: number
@@ -2145,6 +2146,7 @@ export type GlobalSession = {
   title: string
   version: string
   history?: string
+  state_record?: string
   time: {
     created: number
     updated: number

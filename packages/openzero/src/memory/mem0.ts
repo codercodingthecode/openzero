@@ -4,6 +4,8 @@ import { Log } from "../util/log"
 import { MemoryPrompts } from "./prompts"
 import crypto from "crypto"
 import { performance } from "node:perf_hooks"
+import { generateText, embed, embedMany } from "ai"
+import { Provider } from "../provider/provider"
 
 export namespace Mem0Integration {
   const log = Log.create({ service: "mem0" })
@@ -44,14 +46,21 @@ export namespace Mem0Integration {
     }) as T
   }
 
+  function stripCodeBlocks(input: string): string {
+    const match = input.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+    if (!match) return input
+    return match[1].trim()
+  }
+
   function instrumentMemory(memory: Memory): void {
+    const m = memory as any
     let llmCalls = 0
-    if (memory.llm?.generateResponse) {
-      const original = memory.llm.generateResponse.bind(memory.llm)
-      memory.llm.generateResponse = wrapTiming("llm.generateResponse", original, (args) => {
+    if (m.llm?.generateResponse) {
+      const original = m.llm.generateResponse.bind(m.llm)
+      m.llm.generateResponse = wrapTiming("llm.generateResponse", original, (args) => {
         const messages = args[0]
         const promptChars = Array.isArray(messages)
-          ? messages.reduce((sum, msg) => {
+          ? messages.reduce((sum: number, msg: any) => {
               const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)
               return sum + content.length
             }, 0)
@@ -60,64 +69,64 @@ export namespace Mem0Integration {
         return {
           call: llmCalls,
           promptChars,
-          responseFormat: args[1]?.type,
+          responseFormat: (args[1] as any)?.type,
         }
       })
     }
 
-    if (memory.embedder?.embed) {
-      const original = memory.embedder.embed.bind(memory.embedder)
-      memory.embedder.embed = wrapTiming("embedder.embed", original, (args) => ({
+    if (m.embedder?.embed) {
+      const original = m.embedder.embed.bind(m.embedder)
+      m.embedder.embed = wrapTiming("embedder.embed", original, (args) => ({
         textChars: typeof args[0] === "string" ? args[0].length : JSON.stringify(args[0]).length,
       }))
     }
 
-    if (memory.embedder?.embedBatch) {
-      const original = memory.embedder.embedBatch.bind(memory.embedder)
-      memory.embedder.embedBatch = wrapTiming("embedder.embedBatch", original, (args) => ({
+    if (m.embedder?.embedBatch) {
+      const original = m.embedder.embedBatch.bind(m.embedder)
+      m.embedder.embedBatch = wrapTiming("embedder.embedBatch", original, (args) => ({
         count: Array.isArray(args[0]) ? args[0].length : 0,
       }))
     }
 
-    if (memory.vectorStore?.search) {
-      const original = memory.vectorStore.search.bind(memory.vectorStore)
-      memory.vectorStore.search = wrapTiming("vectorStore.search", original, (args) => ({
+    if (m.vectorStore?.search) {
+      const original = m.vectorStore.search.bind(m.vectorStore)
+      m.vectorStore.search = wrapTiming("vectorStore.search", original, (args) => ({
         limit: args[1],
       }))
     }
 
-    if (memory.vectorStore?.insert) {
-      const original = memory.vectorStore.insert.bind(memory.vectorStore)
-      memory.vectorStore.insert = wrapTiming("vectorStore.insert", original, (args) => ({
+    if (m.vectorStore?.insert) {
+      const original = m.vectorStore.insert.bind(m.vectorStore)
+      m.vectorStore.insert = wrapTiming("vectorStore.insert", original, (args) => ({
         count: Array.isArray(args[0]) ? args[0].length : 0,
       }))
     }
 
-    if (memory.vectorStore?.update) {
-      const original = memory.vectorStore.update.bind(memory.vectorStore)
-      memory.vectorStore.update = wrapTiming("vectorStore.update", original)
+    if (m.vectorStore?.update) {
+      const original = m.vectorStore.update.bind(m.vectorStore)
+      m.vectorStore.update = wrapTiming("vectorStore.update", original)
     }
 
-    if (memory.vectorStore?.get) {
-      const original = memory.vectorStore.get.bind(memory.vectorStore)
-      memory.vectorStore.get = wrapTiming("vectorStore.get", original)
+    if (m.vectorStore?.get) {
+      const original = m.vectorStore.get.bind(m.vectorStore)
+      m.vectorStore.get = wrapTiming("vectorStore.get", original)
     }
 
-    if (memory.vectorStore?.delete) {
-      const original = memory.vectorStore.delete.bind(memory.vectorStore)
-      memory.vectorStore.delete = wrapTiming("vectorStore.delete", original)
+    if (m.vectorStore?.delete) {
+      const original = m.vectorStore.delete.bind(m.vectorStore)
+      m.vectorStore.delete = wrapTiming("vectorStore.delete", original)
     }
 
-    if (memory.vectorStore?.list) {
-      const original = memory.vectorStore.list.bind(memory.vectorStore)
-      memory.vectorStore.list = wrapTiming("vectorStore.list", original, (args) => ({
+    if (m.vectorStore?.list) {
+      const original = m.vectorStore.list.bind(m.vectorStore)
+      m.vectorStore.list = wrapTiming("vectorStore.list", original, (args) => ({
         limit: args[1],
       }))
     }
 
-    if (memory.db?.addHistory) {
-      const original = memory.db.addHistory.bind(memory.db)
-      memory.db.addHistory = wrapTiming("history.add", original)
+    if (m.db?.addHistory) {
+      const original = m.db.addHistory.bind(m.db)
+      m.db.addHistory = wrapTiming("history.add", original)
     }
   }
 
@@ -130,6 +139,9 @@ export namespace Mem0Integration {
       "text-embedding-3-small": 1536,
       "text-embedding-3-large": 3072,
       "text-embedding-ada-002": 1536,
+      // Google
+      "gemini-embedding-001": 3072,
+      "text-embedding-004": 768,
       // Ollama / nomic
       "nomic-embed-text": 768,
       "nomic-embed-text-v1": 768,
@@ -154,20 +166,25 @@ export namespace Mem0Integration {
       "voyage-large-2": 1536,
       "voyage-2": 1024,
       "voyage-code-2": 1536,
+      // Qwen (OpenRouter)
+      "qwen3-embedding-4b": 4096,
+      "qwen3-embedding-8b": 4096,
     }
 
-    const modelName = model.includes("/") ? model.split("/")[1] : model
+    // Extract last segment: "openrouter/qwen/qwen3-embedding-8b" -> "qwen3-embedding-8b"
+    const modelName = model.includes("/") ? model.split("/").pop()! : model
     return dimensions[modelName] ?? 1536
   }
 
   /**
    * Parse model string into provider and model name
    * e.g., "openai/gpt-4o-mini" -> { provider: "openai", model: "gpt-4o-mini" }
+   * e.g., "openrouter/qwen/qwen3-embedding-8b" -> { provider: "openrouter", model: "qwen/qwen3-embedding-8b" }
    */
   function parseModelString(modelString: string): { provider: string; model: string } {
     const parts = modelString.split("/")
-    if (parts.length === 2) {
-      return { provider: parts[0], model: parts[1] }
+    if (parts.length >= 2) {
+      return { provider: parts[0], model: parts.slice(1).join("/") }
     }
     // Default to openai if no provider specified
     return { provider: "openai", model: modelString }
@@ -203,6 +220,7 @@ export namespace Mem0Integration {
     const memoryModel = parseModelString(model)
     const embeddingModel = parseModelString(embModel)
     const embeddingDims = config?.embedding_dims ?? getEmbeddingDimension(embModel)
+    const collection = `openzero_memories_${embeddingDims}`
 
     log.info("initializing mem0", {
       memoryModel: model,
@@ -213,16 +231,21 @@ export namespace Mem0Integration {
     })
 
     try {
+      // WORKAROUND: mem0ai rejects unsupported providers at init (e.g. "github-copilot", "openrouter")
+      // Pass a fake provider name that mem0ai accepts, then proxy intercepts all real calls
+      const llmProviderForMem0 = "openai" // mem0ai accepts this
+      const embedProviderForMem0 = "openai" // mem0ai accepts this
+
       memoryInstance = new Memory({
         llm: {
-          provider: memoryModel.provider,
+          provider: llmProviderForMem0,
           config: {
             model: memoryModel.model,
             apiKey: llmApiKey,
           },
         },
         embedder: {
-          provider: embeddingModel.provider,
+          provider: embedProviderForMem0,
           config: {
             model: embeddingModel.model,
             apiKey: embedApiKey,
@@ -231,15 +254,100 @@ export namespace Mem0Integration {
         vectorStore: {
           provider: "qdrant",
           config: {
-            collectionName: "openzero_memories",
+            collectionName: collection,
             host: qdrantHost,
             port: qdrantPort,
-            embedding_model_dims: embeddingDims,
+            dimension: embeddingDims,
           },
         },
         disableHistory: true,
         customPrompt: MemoryPrompts.EXTRACTION_PROMPT,
       })
+
+      // Proxy Mem0 LLM and Embedder back to OpenZero
+      const m = memoryInstance as any
+
+      // LLM Proxy
+      if (m.llm) {
+        m.llm.generateResponse = async (messages: any[], responseFormat?: { type: string }, tools?: any[]) => {
+          log.debug("mem0 proxied llm call", { responseFormat, tools: tools?.length })
+
+          const fullModel = await Provider.getModel(memoryModel.provider, memoryModel.model)
+          const languageModel = await Provider.getLanguage(fullModel)
+
+          const textMessages = messages.map((msg) => {
+            const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)
+            return { role: msg.role === "assistant" ? "assistant" : msg.role === "system" ? "system" : "user", content }
+          }) as any[]
+
+          const result = await generateText({
+            model: languageModel,
+            messages: textMessages,
+            // Only add tool parsing if we didn't explicitly request json, since the two might clash
+            // Mem0 handles tool parsing itself if we just return the JSON string
+          })
+
+          if (responseFormat?.type === "json_object") {
+            return stripCodeBlocks(result.text)
+          }
+
+          if (tools && tools.length > 0) {
+            // Mem0 expects either a string or an object with toolCalls
+            // Let's try to see if the model gave us a tool call directly
+            if (result.toolCalls && result.toolCalls.length > 0) {
+              return {
+                content: result.text || "",
+                role: "assistant",
+                toolCalls: result.toolCalls.map((tc: any) => ({
+                  name: tc.toolName,
+                  arguments: JSON.stringify(tc.args || tc.parameters || tc.arguments || {}),
+                })),
+              }
+            }
+
+            // Fallback: see if the text is JSON that matches a tool
+            try {
+              const parsed = JSON.parse(result.text)
+              // Simple heuristic: if it looks like the tool args, wrap it
+              if (Object.keys(parsed).length > 0) {
+                return {
+                  content: "",
+                  role: "assistant",
+                  toolCalls: [
+                    {
+                      name: tools[0].function.name, // Usually mem0 only passes one tool at a time
+                      arguments: result.text,
+                    },
+                  ],
+                }
+              }
+            } catch (e) {
+              // Not JSON, just return text
+            }
+          }
+
+          return result.text
+        }
+      }
+
+      // Embedder Proxy
+      if (m.embedder) {
+        m.embedder.embed = async (text: string) => {
+          log.debug("mem0 proxied embed call")
+          const fullModel = await Provider.getModel(embeddingModel.provider, embeddingModel.model)
+          const embeddingModelV2 = await Provider.getEmbedding(fullModel)
+          const result = await embed({ model: embeddingModelV2, value: text })
+          return result.embedding
+        }
+
+        m.embedder.embedBatch = async (texts: string[]) => {
+          log.debug("mem0 proxied embedBatch call", { count: texts.length })
+          const fullModel = await Provider.getModel(embeddingModel.provider, embeddingModel.model)
+          const embeddingModelV2 = await Provider.getEmbedding(fullModel)
+          const result = await embedMany({ model: embeddingModelV2, values: texts })
+          return result.embeddings
+        }
+      }
 
       instrumentMemory(memoryInstance)
 

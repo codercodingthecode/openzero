@@ -3,7 +3,7 @@ import os from "os"
 import fuzzysort from "fuzzysort"
 import { Config } from "../config/config"
 import { mapValues, mergeDeep, omit, pickBy, sortBy } from "remeda"
-import { NoSuchModelError, type Provider as SDK } from "ai"
+import { NoSuchModelError, type Provider as SDK, type EmbeddingModel } from "ai"
 import { Log } from "../util/log"
 import { BunProc } from "../bun"
 import { Plugin } from "../plugin"
@@ -1181,6 +1181,24 @@ export namespace Provider {
         : sdk.languageModel(model.api.id)
       s.models.set(key, language)
       return language
+    } catch (e) {
+      if (e instanceof NoSuchModelError)
+        throw new ModelNotFoundError(
+          {
+            modelID: model.id,
+            providerID: model.providerID,
+          },
+          { cause: e },
+        )
+      throw e
+    }
+  }
+
+  export async function getEmbedding(model: Model) {
+    const sdk = await getSDK(model)
+
+    try {
+      return sdk.textEmbeddingModel(model.api.id)
     } catch (e) {
       if (e instanceof NoSuchModelError)
         throw new ModelNotFoundError(

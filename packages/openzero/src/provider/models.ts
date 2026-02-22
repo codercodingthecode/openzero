@@ -115,7 +115,41 @@ export namespace ModelsDev {
       })
     })
     if (result && result.ok) {
-      await Filesystem.write(filepath, await result.text())
+      const fetched = await result.text()
+      const fetchedData = JSON.parse(fetched)
+
+      // Merge custom OpenRouter embeddings that aren't in models.dev upstream
+      if (fetchedData.openrouter && !fetchedData.openrouter.models["qwen/qwen3-embedding-8b"]) {
+        fetchedData.openrouter.models["qwen/qwen3-embedding-8b"] = {
+          id: "qwen/qwen3-embedding-8b",
+          name: "Qwen3 Embedding 8B",
+          family: "text-embedding",
+          attachment: false,
+          reasoning: false,
+          tool_call: false,
+          structured_output: false,
+          temperature: false,
+          knowledge: "2025-10",
+          release_date: "2026-01-10",
+          last_updated: "2026-02-21",
+          modalities: {
+            input: ["text"],
+            output: ["text"],
+          },
+          open_weights: true,
+          cost: {
+            input: 0.01,
+            output: 0,
+          },
+          limit: {
+            context: 32768,
+            input: 32768,
+            output: 0,
+          },
+        }
+      }
+
+      await Filesystem.write(filepath, JSON.stringify(fetchedData))
       ModelsDev.Data.reset()
     }
   }
