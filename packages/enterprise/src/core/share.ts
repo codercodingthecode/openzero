@@ -1,10 +1,10 @@
 import { FileDiff, Message, Model, Part, Session } from "@openzero/sdk/v2"
-import { fn } from "@opencode-ai/util/fn"
-import { iife } from "@opencode-ai/util/iife"
-import { Identifier } from "@opencode-ai/util/identifier"
+import { fn } from "@openzero/util/fn"
+import { iife } from "@openzero/util/iife"
+import { Identifier } from "@openzero/util/identifier"
 import z from "zod"
 import { Storage } from "./storage"
-import { Binary } from "@opencode-ai/util/binary"
+import { Binary } from "@openzero/util/binary"
 
 export namespace Share {
   export const Info = z.object({

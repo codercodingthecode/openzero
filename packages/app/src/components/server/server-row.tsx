@@ -1,4 +1,4 @@
-import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { Tooltip } from "@openzero/ui/tooltip"
 import {
   createEffect,
   createMemo,
