@@ -181,13 +181,20 @@ else
     fi
 
     if [ -z "$requested_version" ]; then
-        url="https://github.com/codercodingthecode/openzero/releases/latest/download/$filename"
+        # Try stable release first, fall back to latest prerelease
         specific_version=$(curl -s https://api.github.com/repos/codercodingthecode/openzero/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
 
-        if [[ $? -ne 0 || -z "$specific_version" ]]; then
+        if [ -z "$specific_version" ]; then
+            # No stable release found, try latest prerelease
+            specific_version=$(curl -s "https://api.github.com/repos/codercodingthecode/openzero/releases?per_page=1" | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' | head -1)
+        fi
+
+        if [ -z "$specific_version" ]; then
             echo -e "${RED}Failed to fetch version information${NC}"
             exit 1
         fi
+
+        url="https://github.com/codercodingthecode/openzero/releases/download/v${specific_version}/$filename"
     else
         # Strip leading 'v' if present
         requested_version="${requested_version#v}"
