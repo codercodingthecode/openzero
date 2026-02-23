@@ -1,13 +1,13 @@
 name: containers
 
 on:
-  push:
-    branches:
-      - dev
-    paths:
-      - packages/containers/**
-      - .github/workflows/containers.yml
-      - package.json
+  # push:
+  #   branches:
+  #     - dev
+  #   paths:
+  #     - packages/containers/**
+  #     - .github/workflows/containers.yml
+  #     - package.json
   workflow_dispatch:
 
 permissions:

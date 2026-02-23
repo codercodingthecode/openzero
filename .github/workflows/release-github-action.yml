@@ -1,11 +1,12 @@
 name: release-github-action
 
 on:
-  push:
-    branches:
-      - dev
-    paths:
-      - "github/**"
+  # push:
+  #   branches:
+  #     - dev
+  #   paths:
+  #     - "github/**"
+  workflow_dispatch:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
