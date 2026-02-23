@@ -85,9 +85,10 @@
     "typescript": "catalog:",
     "openzero": "workspace:*"
   },
+  "author": "Andy Lavor <andersonlavor@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anomalyco/opencode"
+    "url": "https://github.com/codercodingthecode/openzero"
   },
   "license": "MIT",
   "prettier": {

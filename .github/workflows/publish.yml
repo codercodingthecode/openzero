@@ -50,7 +50,7 @@ jobs:
 
       - name: Install OpenCode
         if: inputs.bump || inputs.version
-        run: bun i -g opencode-ai
+        run: bun i -g openzero
 
       - id: version
         run: |
@@ -88,7 +88,7 @@ jobs:
       - name: Build
         id: build
         run: |
-          ./packages/opencode/script/build.ts
+          ./packages/openzero/script/build.ts
         env:
           OPENCODE_VERSION: ${{ needs.version.outputs.version }}
           OPENCODE_RELEASE: ${{ needs.version.outputs.release }}
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: openzero-cli
-          path: packages/opencode/dist
+          path: packages/openzero/dist
 
     outputs:
       version: ${{ needs.version.outputs.version }}
@@ -226,7 +226,7 @@ jobs:
           tagName: ${{ needs.version.outputs.tag }}
           releaseDraft: true
           releaseAssetNamePattern: openzero-desktop-[platform]-[arch][ext]
-          repo: ${{ (github.ref_name == 'beta' && 'opencode-beta') || '' }}
+          repo: ${{ (github.ref_name == 'beta' && 'openzero-beta') || '' }}
           releaseCommitish: ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ steps.committer.outputs.token }}
@@ -279,7 +279,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: openzero-cli
-          path: packages/opencode/dist
+          path: packages/openzero/dist
 
       - name: Cache apt packages (AUR)
         uses: actions/cache@v4
@@ -296,8 +296,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.AUR_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          git config --global user.email "opencode@sst.dev"
-          git config --global user.name "opencode"
+          git config --global user.email "andersonlavor@gmail.com"
+          git config --global user.name "openzero"
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts || true
 
       - run: ./script/publish.ts
