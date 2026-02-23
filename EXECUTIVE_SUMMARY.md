@@ -593,9 +593,8 @@ The project has strong technical merit, clear value proposition, and minimal bar
 ### B. Contact Information
 
 **Project Lead**: Andy Lavor  
-**Email**: andersonlavor@gmail.com  
-**GitHub**: @andersonlavor  
-**Project**: github.com/openzero-ai/openzero (pending)
+**GitHub Issues**: https://github.com/codercodingthecode/openzero/issues  
+**Project**: github.com/codercodingthecode/openzero
 
 ### C. References
 

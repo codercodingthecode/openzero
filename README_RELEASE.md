@@ -494,10 +494,9 @@ openzero/
 ## 📞 Contact & Support
 
 **Project Lead**: Andy Lavor  
-**Email**: andersonlavor@gmail.com  
-**GitHub**: @andersonlavor (pending)
+**GitHub Issues**: https://github.com/codercodingthecode/openzero/issues
 
-**Repository**: github.com/openzero-ai/openzero (pending)  
+**Repository**: github.com/codercodingthecode/openzero  
 **Documentation**: docs.openzero.ai (pending)  
 **Community**: discord.gg/openzero (pending)
 

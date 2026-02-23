@@ -52,7 +52,7 @@ Add OpenAI as a provider in your config:
 ### 3. Start OpenZero in Dev Mode
 
 ```bash
-cd /Users/andy/projects/openzero/packages/openzero
+cd packages/openzero
 bun run dev
 ```
 

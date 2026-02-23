@@ -440,10 +440,9 @@ Commit 9 (c9f6668d7):
 ### By Author
 
 ```
-Andy Lavor (andersonlavor@gmail.com): 7 commits
-Andy Lavor (andy@...):                5 commits
+Andy Lavor: 12 commits
 ────────────────────────────────────────────────
-Total:                                12 commits
+Total:      12 commits
 ```
 
 ### By Day
