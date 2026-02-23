@@ -10,7 +10,7 @@ CREATE TABLE "provider" (
   "last_updated" integer NOT NULL,
   "data" text
 );
-
+--> statement-breakpoint
 CREATE TABLE "provider_model" (
   "id" text PRIMARY KEY NOT NULL,
   "provider_id" text NOT NULL,
@@ -26,6 +26,7 @@ CREATE TABLE "provider_model" (
   "last_updated" integer NOT NULL,
   FOREIGN KEY ("provider_id") REFERENCES "provider"("id") ON UPDATE no action ON DELETE cascade
 );
-
+--> statement-breakpoint
 CREATE INDEX "provider_model_provider_idx" ON "provider_model" ("provider_id");
+--> statement-breakpoint
 CREATE INDEX "provider_model_modality_idx" ON "provider_model" ("modalities");

@@ -266,7 +266,9 @@ export namespace Config {
 
   export async function installDependencies(dir: string) {
     const pkg = path.join(dir, "package.json")
-    const targetVersion = Installation.isLocal() ? "*" : Installation.VERSION
+    const targetVersion = Installation.isLocal()
+      ? `file:${path.join(import.meta.dirname, "../../../plugin")}`
+      : Installation.VERSION
 
     const json = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => ({
       dependencies: {},
@@ -327,14 +329,9 @@ export namespace Config {
     const depVersion = dependencies["@openzero/plugin"]
     if (!depVersion) return true
 
-    const targetVersion = Installation.isLocal() ? "latest" : Installation.VERSION
-    if (targetVersion === "latest") {
-      const isOutdated = await PackageRegistry.isOutdated("@openzero/plugin", depVersion, dir)
-      if (!isOutdated) return false
-      log.info("Cached version is outdated, proceeding with install", {
-        pkg: "@openzero/plugin",
-        cachedVersion: depVersion,
-      })
+    const targetVersion = Installation.isLocal() ? "local" : Installation.VERSION
+    if (targetVersion === "local") {
+      if (depVersion.startsWith("file:")) return false
       return true
     }
     if (depVersion === targetVersion) return false

@@ -59,11 +59,11 @@ const keepSandbox = process.env.OPENCODE_E2E_KEEP_SANDBOX === "1"
 
 const serverEnv = {
   ...process.env,
-  OPENCODE_DISABLE_SHARE: process.env.OPENCODE_DISABLE_SHARE ?? "true",
-  OPENCODE_DISABLE_LSP_DOWNLOAD: "true",
-  OPENCODE_DISABLE_DEFAULT_PLUGINS: "true",
-  OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "true",
-  OPENCODE_TEST_HOME: path.join(sandbox, "home"),
+  OPENZERO_DISABLE_SHARE: process.env.OPENZERO_DISABLE_SHARE ?? "true",
+  OPENZERO_DISABLE_LSP_DOWNLOAD: "true",
+  OPENZERO_DISABLE_DEFAULT_PLUGINS: "true",
+  OPENZERO_EXPERIMENTAL_DISABLE_FILEWATCHER: "true",
+  OPENZERO_TEST_HOME: path.join(sandbox, "home"),
   XDG_DATA_HOME: path.join(sandbox, "share"),
   XDG_CACHE_HOME: path.join(sandbox, "cache"),
   XDG_CONFIG_HOME: path.join(sandbox, "config"),
@@ -72,7 +72,7 @@ const serverEnv = {
   OPENCODE_E2E_SESSION_TITLE: "E2E Session",
   OPENCODE_E2E_MESSAGE: "Seeded for UI e2e",
   OPENCODE_E2E_MODEL: "opencode/gpt-5-nano",
-  OPENCODE_CLIENT: "app",
+  OPENZERO_CLIENT: "app",
 } satisfies Record<string, string>
 
 const runnerEnv = {
