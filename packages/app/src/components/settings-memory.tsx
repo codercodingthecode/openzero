@@ -134,7 +134,7 @@ export const SettingsMemory: Component = () => {
             />
             <Show when={!config().model}>
               <p class="text-12-regular text-status-error">
-                <Icon name="alert-circle" class="inline w-3 h-3 mr-1" />
+                <Icon name="warning" class="inline w-3 h-3 mr-1" />
                 Memory model is required
               </p>
             </Show>
@@ -154,7 +154,7 @@ export const SettingsMemory: Component = () => {
             />
             <Show when={!config().embedding_model}>
               <p class="text-12-regular text-status-error">
-                <Icon name="alert-circle" class="inline w-3 h-3 mr-1" />
+                <Icon name="warning" class="inline w-3 h-3 mr-1" />
                 Embedding model is required
               </p>
             </Show>
@@ -315,7 +315,7 @@ export const SettingsMemory: Component = () => {
           {/* Status Info */}
           <div class="flex flex-col gap-2 p-4 bg-surface-secondary rounded-lg">
             <div class="flex items-start gap-2">
-              <Icon name="info" class="w-4 h-4 mt-0.5 text-text-weak" />
+              <Icon name="help" class="w-4 h-4 mt-0.5 text-text-weak" />
               <div class="flex flex-col gap-1 text-12-regular text-text-weak">
                 <p>
                   Memory data is stored locally in <code>~/.openzero/memory/</code>
