@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openzero-runner
+    restart: unless-stopped
+    environment:
+      - RUNNER_TOKEN=${RUNNER_TOKEN}
+      - RUNNER_NAME=${RUNNER_NAME:-openzero-lab-runner}
+      - RUNNER_WORKDIR=${RUNNER_WORKDIR:-_work}
+      - REPO_URL=${REPO_URL:-https://github.com/codercodingthecode/openzero}
+      - RUNNER_LABELS=${RUNNER_LABELS:-self-hosted,linux,x64,docker,lab}
+    volumes:
+      # Mount Docker socket for Docker-in-Docker workflows
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persist runner work directory
+      - runner-work:/home/runner/_work
+    privileged: true
+
+volumes:
+  runner-work:
