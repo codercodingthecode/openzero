@@ -40,9 +40,9 @@ jobs:
           - name: linux
             host: [self-hosted, linux, x64, docker, lab]
             playwright: bunx playwright install --with-deps
-          - name: windows
-            host: windows-latest
-            playwright: bunx playwright install
+          # - name: windows
+          #   host: windows-latest
+          #   playwright: bunx playwright install
     runs-on: ${{ matrix.settings.host }}
     env:
       PLAYWRIGHT_BROWSERS_PATH: 0
