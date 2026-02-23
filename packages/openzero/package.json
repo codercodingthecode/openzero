@@ -137,8 +137,5 @@
   "overrides": {
     "drizzle-orm": "1.0.0-beta.12-a5629fb",
     "sqlite3": "file:./.stubs/sqlite3"
-  },
-  "optionalDependencies": {
-    "openzero-darwin-arm64": "./dist/openzero-darwin-arm64"
   }
 }
