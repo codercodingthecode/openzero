@@ -49,9 +49,10 @@ jobs:
           opencode-app-id: ${{ vars.OPENCODE_APP_ID }}
           opencode-app-secret: ${{ secrets.OPENCODE_APP_SECRET }}
 
-      - name: Install OpenCode
-        if: inputs.bump || inputs.version
-        run: bun i -g openzero
+      # Commented out — openzero is not published to npm; CLI is distributed via curl|bash installer
+      # - name: Install OpenCode
+      #   if: inputs.bump || inputs.version
+      #   run: bun i -g openzero
 
       - id: version
         run: |
