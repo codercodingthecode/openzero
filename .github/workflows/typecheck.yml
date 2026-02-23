@@ -9,7 +9,7 @@ on:
 
 jobs:
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, docker, lab]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

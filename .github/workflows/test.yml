@@ -9,7 +9,7 @@ on:
 jobs:
   unit:
     name: unit (linux)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, docker, lab]
     defaults:
       run:
         shell: bash
@@ -38,7 +38,7 @@ jobs:
       matrix:
         settings:
           - name: linux
-            host: ubuntu-latest
+            host: [self-hosted, linux, x64, docker, lab]
             playwright: bunx playwright install --with-deps
           - name: windows
             host: windows-latest
@@ -81,7 +81,7 @@ jobs:
 
   required:
     name: test (linux)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, docker, lab]
     needs:
       - unit
       - e2e
