@@ -12,7 +12,14 @@
 ## Install
 
 ```bash
+# Latest stable release
 curl -fsSL https://raw.githubusercontent.com/codercodingthecode/openzero/dev/install | bash
+
+# Latest nightly (prerelease)
+curl -fsSL https://raw.githubusercontent.com/codercodingthecode/openzero/dev/install | bash -s -- --nightly
+
+# Specific version
+curl -fsSL https://raw.githubusercontent.com/codercodingthecode/openzero/dev/install | bash -s -- --version 1.2.11
 ```
 
 ---
