@@ -44,7 +44,7 @@ async function waitForHealth(url: string) {
 
 const appDir = process.cwd()
 const repoDir = path.resolve(appDir, "../..")
-const opencodeDir = path.join(repoDir, "packages", "opencode")
+const opencodeDir = path.join(repoDir, "packages", "openzero")
 
 const extraArgs = (() => {
   const args = process.argv.slice(2)
@@ -131,7 +131,7 @@ process.once("unhandledRejection", (error) => {
 let code = 1
 
 try {
-  seed = Bun.spawn(["bun", "script/seed-e2e.ts"], {
+  seed = Bun.spawn([process.execPath, "script/seed-e2e.ts"], {
     cwd: opencodeDir,
     env: serverEnv,
     stdout: "inherit",
@@ -146,21 +146,21 @@ try {
     process.env.AGENT = "1"
     process.env.OPENCODE = "1"
 
-    const log = await import("../../opencode/src/util/log")
-    const install = await import("../../opencode/src/installation")
+    const log = await import("../../openzero/src/util/log")
+    const install = await import("../../openzero/src/installation")
     await log.Log.init({
       print: true,
       dev: install.Installation.isLocal(),
       level: "WARN",
     })
 
-    const servermod = await import("../../opencode/src/server/server")
-    inst = await import("../../opencode/src/project/instance")
+    const servermod = await import("../../openzero/src/server/server")
+    inst = await import("../../openzero/src/project/instance")
     server = servermod.Server.listen({ port: serverPort, hostname: "127.0.0.1" })
     console.log(`opencode server listening on http://127.0.0.1:${serverPort}`)
 
     await waitForHealth(`http://127.0.0.1:${serverPort}/global/health`)
-    runner = Bun.spawn(["bun", "test:e2e", ...extraArgs], {
+    runner = Bun.spawn([process.execPath, "test:e2e", ...extraArgs], {
       cwd: appDir,
       env: runnerEnv,
       stdout: "inherit",
