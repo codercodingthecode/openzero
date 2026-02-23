@@ -247,7 +247,7 @@ for (const item of targets) {
 if (Script.release) {
   const repo = process.env.GH_REPO ?? "codercodingthecode/openzero"
   const token = process.env.GH_TOKEN
-  const tag = `v${Script.version}`
+  const releaseId = process.env.OPENCODE_RELEASE
 
   for (const key of Object.keys(binaries)) {
     if (key.includes("linux")) {
@@ -257,15 +257,14 @@ if (Script.release) {
     }
   }
 
-  // Get the release ID from the tag
-  const release = (await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag}`, {
+  // Get the upload URL from the release ID (draft releases can't be fetched by tag)
+  const release = (await fetch(`https://api.github.com/repos/${repo}/releases/${releaseId}`, {
     headers: {
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${token}`,
     },
   }).then((r) => r.json())) as { id: number; upload_url: string }
 
-  // Upload each asset via GitHub API
   const uploadUrl = release.upload_url.replace(/\{[^}]+\}/, "")
   const assets = await Array.fromAsync(new Bun.Glob("dist/*.{zip,tar.gz}").scan({ absolute: true }))
   for (const asset of assets) {
