@@ -1,13 +1,12 @@
 name: test
 
-# Temporarily disabled — skipping tests to focus on publish/release
-# on:
-#   push:
-#     branches:
-#       - dev
-#   pull_request:
-#   workflow_dispatch:
-on: workflow_dispatch
+on:
+  push:
+    branches:
+      - dev
+      - master
+  pull_request:
+  workflow_dispatch:
 jobs:
   unit:
     name: unit (linux)

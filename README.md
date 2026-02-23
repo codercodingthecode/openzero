@@ -9,6 +9,14 @@
 
 ---
 
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/codercodingthecode/openzero/dev/install | bash
+```
+
+---
+
 ## What Is OpenZero
 
 OpenZero is a self-hostable, open-source AI development environment that solves the two deepest problems in today's AI coding assistants: **they forget everything between sessions**, and **they choke on long conversations**.
@@ -224,28 +232,15 @@ Memory behavior is fully configurable via the TUI settings panel or the project 
 
 OpenZero is a substantial engineering effort on top of the OpenCode baseline. The following table summarizes the key differences:
 
-| Capability             | OpenCode                                | OpenZero                                                                                      |
-| :--------------------- | :-------------------------------------- | :-------------------------------------------------------------------------------------------- |
-| Memory system          | Single plain-text type, mem0 infer mode | Six typed schemas, custom extraction pipeline                                                 |
-| Memory storage         | In-memory / file-based                  | Qdrant vector database with 4096-dim embeddings                                               |
-| Deduplication          | None                                    | Hash-based algorithmic deduplication                                                          |
-| Context management     | Parallel compaction (uncoordinated)     | Unified three-tier hierarchical compression                                                   |
-| Settings storage       | JSON cache files                        | SQLite with ACID transactions                                                                 |
-| Embedding support      | Default provider dimensions             | OpenRouter Qwen3-Embedding-8B at 4096 dimensions                                              |
-| Memory retrieval       | Basic text matching                     | Cosine-similarity semantic search with type-aware formatting                                  |
-| Backward compatibility | N/A                                     | Full -- plain-text memories from the original system are auto-detected and rendered correctly |
-
-### Development Investment
-
-The project was built across three intensive phases over three days:
-
-| Phase                      | Focus                                                                         | Duration | Key Deliverables                                                      |
-| :------------------------- | :---------------------------------------------------------------------------- | :------- | :-------------------------------------------------------------------- |
-| **1 -- Foundation**        | mem0 integration, Qdrant setup, basic hooks, TUI settings                     | 1 day    | Working memory pipeline, configuration UI                             |
-| **2 -- Optimization**      | Hierarchical compression, token tracking, rate limiting, state persistence    | 1 day    | Three-tier compression engine, per-exchange token display             |
-| **3 -- Structured System** | Custom extraction pipeline, six memory schemas, legacy removal, documentation | 2 days   | Complete structured memory system, full legacy compaction eradication |
-
-Total: approximately 3,100 new lines of application code, 23 new source files, and 15 documentation files across 13 commits.
+| Capability         | OpenCode                                 | OpenZero                                                            |
+| :----------------- | :--------------------------------------- | :------------------------------------------------------------------ |
+| Memory system      | None                                     | Six typed schemas, custom extraction pipeline with mem0 integration |
+| Memory storage     | None                                     | Qdrant vector database with 4096-dim embeddings                     |
+| Deduplication      | None                                     | mem0-delegated deduplication via embedding similarity               |
+| Context management | Single-pass LLM compaction on overflow   | Unified three-tier hierarchical compression (50/30/20 budget split) |
+| Embedding support  | None                                     | OpenRouter Qwen3-Embedding-8B at 4096 dimensions                    |
+| Memory retrieval   | None                                     | Cosine-similarity semantic search with type-aware formatting        |
+| Configuration      | JSON files (opencode.json / config.json) | JSON files (same) plus SQLite for session and compression history   |
 
 ---
 

@@ -6,6 +6,7 @@ on:
     branches:
       - ci
       - dev
+      - master
       - beta
       - snapshot-*
   workflow_dispatch:
@@ -34,7 +35,9 @@ permissions:
 jobs:
   version:
     runs-on: [self-hosted, linux, x64, docker, lab]
-    if: github.repository == 'codercodingthecode/openzero'
+    if: >-
+      github.repository == 'codercodingthecode/openzero' &&
+      !startsWith(github.event.head_commit.message, 'release:')
     steps:
       - uses: actions/checkout@v3
         with:

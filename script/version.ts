@@ -19,7 +19,7 @@ async function ghApi(endpoint: string, options?: RequestInit) {
   return res.json()
 }
 
-if (!Script.preview || Script.channel === "beta") {
+if (!Script.preview || Script.channel === "beta" || Script.channel === "dev") {
   const tag = `v${Script.version}`
   const body = `Release ${tag}`
   const release = await ghApi(`/repos/${repo}/releases`, {
