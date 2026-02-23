@@ -283,7 +283,10 @@ jobs:
           path: packages/openzero/dist
 
       - name: Cache apt packages (AUR)
+        if: env.AUR_KEY != ''
         uses: actions/cache@v4
+        env:
+          AUR_KEY: ${{ secrets.AUR_KEY }}
         with:
           path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-aur-${{ hashFiles('.github/workflows/publish.yml') }}
@@ -291,12 +294,14 @@ jobs:
             ${{ runner.os }}-apt-aur-
 
       - name: Setup SSH for AUR
-        if: ${{ secrets.AUR_KEY != '' }}
+        if: env.AUR_KEY != ''
+        env:
+          AUR_KEY: ${{ secrets.AUR_KEY }}
         run: |
           sudo apt-get update
           sudo apt-get install -y pacman-package-manager || true
           mkdir -p ~/.ssh
-          echo "${{ secrets.AUR_KEY }}" > ~/.ssh/id_rsa
+          echo "$AUR_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           git config --global user.email "andersonlavor@gmail.com"
           git config --global user.name "openzero"
