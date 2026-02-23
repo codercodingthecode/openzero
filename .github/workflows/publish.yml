@@ -33,7 +33,7 @@ permissions:
 jobs:
   version:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    if: github.repository == 'anomalyco/opencode'
+    if: github.repository == 'codercodingthecode/openzero'
     steps:
       - uses: actions/checkout@v3
         with:
@@ -60,7 +60,7 @@ jobs:
           OPENCODE_BUMP: ${{ inputs.bump }}
           OPENCODE_VERSION: ${{ inputs.version }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          GH_REPO: ${{ (github.ref_name == 'beta' && 'anomalyco/opencode-beta') || github.repository }}
+          GH_REPO: ${{ (github.ref_name == 'beta' && 'codercodingthecode/openzero-beta') || github.repository }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       release: ${{ steps.version.outputs.release }}
@@ -70,7 +70,7 @@ jobs:
   build-cli:
     needs: version
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    if: github.repository == 'anomalyco/opencode'
+    if: github.repository == 'codercodingthecode/openzero'
     steps:
       - uses: actions/checkout@v3
         with:
@@ -97,7 +97,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: opencode-cli
+          name: openzero-cli
           path: packages/opencode/dist
 
     outputs:
@@ -225,7 +225,7 @@ jobs:
           releaseId: ${{ needs.version.outputs.release }}
           tagName: ${{ needs.version.outputs.tag }}
           releaseDraft: true
-          releaseAssetNamePattern: opencode-desktop-[platform]-[arch][ext]
+          releaseAssetNamePattern: openzero-desktop-[platform]-[arch][ext]
           repo: ${{ (github.ref_name == 'beta' && 'opencode-beta') || '' }}
           releaseCommitish: ${{ github.sha }}
         env:
@@ -278,7 +278,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: opencode-cli
+          name: openzero-cli
           path: packages/opencode/dist
 
       - name: Cache apt packages (AUR)

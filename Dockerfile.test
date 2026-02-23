@@ -1,0 +1,22 @@
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Test the installer
+COPY install /tmp/install
+RUN chmod +x /tmp/install && /tmp/install --help
+
+# Run the installer (using local copy for testing)
+RUN /tmp/install || true
+
+# Verify installation
+RUN test -f ~/.openzero/bin/openzero || (echo "OpenZero binary not found" && exit 1)
+RUN test -f ~/.local/share/openzero/bin/qdrant || (echo "Qdrant binary not found" && exit 1)
+RUN test -d ~/.config/openzero || (echo "Config directory not created" && exit 1)
+RUN test -d ~/.local/share/openzero/memory || (echo "Memory directory not created" && exit 1)
+
+CMD ["/bin/bash"]
