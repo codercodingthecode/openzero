@@ -70,15 +70,9 @@ if (Script.release) {
     await new Promise((resolve) => setTimeout(resolve, 5_000))
   }
 
-  // Undraft the release via GitHub API (no gh CLI dependency)
-  const releases = (await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag}`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-    },
-  }).then((r) => r.json())) as { id: number }
-
-  await fetch(`https://api.github.com/repos/${repo}/releases/${releases.id}`, {
+  // Undraft the release via GitHub API using release ID (draft releases can't be fetched by tag)
+  const releaseId = process.env.OPENCODE_RELEASE
+  await fetch(`https://api.github.com/repos/${repo}/releases/${releaseId}`, {
     method: "PATCH",
     headers: {
       Accept: "application/vnd.github+json",
