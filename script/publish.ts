@@ -69,14 +69,15 @@ if (Script.release) {
   await $`gh release edit v${Script.version} --draft=false --repo ${process.env.GH_REPO}`
 }
 
-console.log("\n=== cli ===\n")
-await import(`../packages/opencode/script/publish.ts`)
+// Commented out — installer-only distribution, no npm/Docker/AUR/Homebrew publishing
+// console.log("\n=== cli ===\n")
+// await import(`../packages/openzero/script/publish.ts`)
 
-console.log("\n=== sdk ===\n")
-await import(`../packages/sdk/js/script/publish.ts`)
+// console.log("\n=== sdk ===\n")
+// await import(`../packages/sdk/js/script/publish.ts`)
 
-console.log("\n=== plugin ===\n")
-await import(`../packages/plugin/script/publish.ts`)
+// console.log("\n=== plugin ===\n")
+// await import(`../packages/plugin/script/publish.ts`)
 
 const dir = new URL("..", import.meta.url).pathname
 process.chdir(dir)
