@@ -190,7 +190,7 @@ else
     if [ -z "$requested_version" ]; then
         if [ "$nightly" = "true" ]; then
             # Fetch latest prerelease
-            specific_version=$(curl -s "https://api.github.com/repos/codercodingthecode/openzero/releases?per_page=10" | sed -n 's/.*"tag_name": *"v\([^"]*\)".*"prerelease": *true.*/\1/p' | head -1)
+            specific_version=$(curl -s "https://api.github.com/repos/codercodingthecode/openzero/releases?per_page=10" | tr -d '\n' | sed 's/},{/}\n{/g' | grep '"prerelease": *true' | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' | head -1)
             if [ -z "$specific_version" ]; then
                 echo -e "${RED}No nightly (prerelease) build found${NC}"
                 echo -e "${MUTED}Available releases: https://github.com/codercodingthecode/openzero/releases${NC}"
