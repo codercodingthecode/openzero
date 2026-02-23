@@ -525,33 +525,8 @@ export namespace SessionPrompt {
         continue
       }
 
-      // pending compaction
-      if (task?.type === "compaction") {
-        const result = await SessionCompaction.process({
-          messages: msgs,
-          parentID: lastUser.id,
-          abort,
-          sessionID,
-          auto: task.auto,
-        })
-        if (result === "stop") break
-        continue
-      }
-
-      // context overflow, needs compaction
-      if (
-        lastFinished &&
-        lastFinished.summary !== true &&
-        (await SessionCompaction.isOverflow({ tokens: lastFinished.tokens, model }))
-      ) {
-        await SessionCompaction.create({
-          sessionID,
-          agent: lastUser.agent,
-          model: lastUser.model,
-          auto: true,
-        })
-        continue
-      }
+      // Context management is now handled by hierarchical compression (SessionCompression)
+      // which runs in the background after each turn. The old compaction system has been removed.
 
       // normal processing
       const agent = await Agent.get(lastUser.agent)
@@ -733,14 +708,7 @@ export namespace SessionPrompt {
       }
 
       if (result === "stop") break
-      if (result === "compact") {
-        await SessionCompaction.create({
-          sessionID,
-          agent: lastUser.agent,
-          model: lastUser.model,
-          auto: true,
-        })
-      }
+      // Note: "compact" result handling removed - hierarchical compression handles context automatically
       continue
     }
     SessionCompaction.prune({ sessionID })
