@@ -1,28 +1,39 @@
 #!/usr/bin/env bun
 
 import { Script } from "@openzero/script"
-import { $ } from "bun"
-import { buildNotes, getLatestRelease } from "./changelog"
 
 const output = [`version=${Script.version}`]
+const repo = process.env.GH_REPO ?? "codercodingthecode/openzero"
+const token = process.env.GH_TOKEN
 
-if (!Script.preview) {
-  const previous = await getLatestRelease()
-  const notes = await buildNotes(previous, "HEAD")
-  const body = notes.join("\n") || "No notable changes"
-  const dir = process.env.RUNNER_TEMP ?? "/tmp"
-  const file = `${dir}/opencode-release-notes.txt`
-  await Bun.write(file, body)
-  await $`gh release create v${Script.version} -d --title "v${Script.version}" --notes-file ${file}`
-  const release = await $`gh release view v${Script.version} --json tagName,databaseId`.json()
-  output.push(`release=${release.databaseId}`)
-  output.push(`tag=${release.tagName}`)
-} else if (Script.channel === "beta") {
-  await $`gh release create v${Script.version} -d --title "v${Script.version}" --repo ${process.env.GH_REPO}`
-  const release =
-    await $`gh release view v${Script.version} --json tagName,databaseId --repo ${process.env.GH_REPO}`.json()
-  output.push(`release=${release.databaseId}`)
-  output.push(`tag=${release.tagName}`)
+async function ghApi(endpoint: string, options?: RequestInit) {
+  const res = await fetch(`https://api.github.com${endpoint}`, {
+    ...options,
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      ...options?.headers,
+    },
+  })
+  if (!res.ok) throw new Error(`GitHub API ${res.status}: ${await res.text()}`)
+  return res.json()
+}
+
+if (!Script.preview || Script.channel === "beta") {
+  const tag = `v${Script.version}`
+  const body = `Release ${tag}`
+  const release = await ghApi(`/repos/${repo}/releases`, {
+    method: "POST",
+    body: JSON.stringify({
+      tag_name: tag,
+      name: tag,
+      body,
+      draft: true,
+      prerelease: Script.preview,
+    }),
+  })
+  output.push(`release=${release.id}`)
+  output.push(`tag=${tag}`)
 }
 
 output.push(`repo=${process.env.GH_REPO}`)

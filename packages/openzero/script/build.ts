@@ -245,6 +245,10 @@ for (const item of targets) {
 }
 
 if (Script.release) {
+  const repo = process.env.GH_REPO ?? "codercodingthecode/openzero"
+  const token = process.env.GH_TOKEN
+  const tag = `v${Script.version}`
+
   for (const key of Object.keys(binaries)) {
     if (key.includes("linux")) {
       await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
@@ -252,7 +256,33 @@ if (Script.release) {
       await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
     }
   }
-  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber --repo ${process.env.GH_REPO}`
+
+  // Get the release ID from the tag
+  const release = (await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+    },
+  }).then((r) => r.json())) as { id: number; upload_url: string }
+
+  // Upload each asset via GitHub API
+  const uploadUrl = release.upload_url.replace(/\{[^}]+\}/, "")
+  const assets = await Array.fromAsync(new Bun.Glob("dist/*.{zip,tar.gz}").scan({ absolute: true }))
+  for (const asset of assets) {
+    const filename = path.basename(asset)
+    const data = await Bun.file(asset).arrayBuffer()
+    const contentType = filename.endsWith(".tar.gz") ? "application/gzip" : "application/zip"
+    console.log(`uploading ${filename}...`)
+    await fetch(`${uploadUrl}?name=${filename}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": contentType,
+      },
+      body: data,
+    })
+  }
 }
 
 export { binaries }

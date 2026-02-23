@@ -57,6 +57,10 @@ await $`bun install`
 await import(`../packages/sdk/js/script/build.ts`)
 
 if (Script.release) {
+  const repo = process.env.GH_REPO ?? "codercodingthecode/openzero"
+  const token = process.env.GITHUB_TOKEN
+  const tag = `v${Script.version}`
+
   if (!Script.preview) {
     await $`git commit -am "release: v${Script.version}"`
     await $`git tag v${Script.version}`
@@ -66,7 +70,22 @@ if (Script.release) {
     await new Promise((resolve) => setTimeout(resolve, 5_000))
   }
 
-  await $`gh release edit v${Script.version} --draft=false --repo ${process.env.GH_REPO}`
+  // Undraft the release via GitHub API (no gh CLI dependency)
+  const releases = (await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+    },
+  }).then((r) => r.json())) as { id: number }
+
+  await fetch(`https://api.github.com/repos/${repo}/releases/${releases.id}`, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ draft: false }),
+  })
 }
 
 // Commented out — installer-only distribution, no npm/Docker/AUR/Homebrew publishing
