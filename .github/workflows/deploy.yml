@@ -1,12 +1,8 @@
-# name: deploy
-#
+name: deploy
+
 # Disabled: requires Cloudflare/PlanetScale/Stripe secrets
-# on:
-#   push:
-#     branches:
-#       - dev
-#       - production
-#   workflow_dispatch:
+on:
+  workflow_dispatch:
 #
 # concurrency: ${{ github.workflow }}-${{ github.ref }}
 #
