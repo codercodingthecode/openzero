@@ -26,9 +26,9 @@ jobs:
       matrix:
         include:
           - system: x86_64-linux
-            runner: blacksmith-4vcpu-ubuntu-2404
+            runner: "[self-hosted, linux, x64, docker, lab]"
           - system: aarch64-linux
-            runner: blacksmith-4vcpu-ubuntu-2404-arm
+            runner: "[self-hosted, linux, x64, docker, lab]"
           - system: x86_64-darwin
             runner: macos-15-intel
           - system: aarch64-darwin
@@ -77,7 +77,7 @@ jobs:
   update-hashes:
     needs: compute-hash
     if: github.event_name != 'pull_request'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: [self-hosted, linux, x64, docker, lab]
 
     steps:
       - name: Checkout repository
