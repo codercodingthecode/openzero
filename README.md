@@ -3,8 +3,8 @@
 </p>
 <p align="center"><strong>The AI coding agent that never forgets.</strong></p>
 <p align="center">
-  <a href="#"><img alt="Version" src="https://img.shields.io/badge/version-[VERSION_PLACEHOLDER]-blue.svg" /></a>
-  <a href="#"><img alt="License" src="https://img.shields.io/badge/license-[LICENSE_PLACEHOLDER]-green.svg" /></a>
+  <a href="https://github.com/codercodingthecode/openzero/releases"><img alt="Version" src="https://img.shields.io/github/v/release/codercodingthecode/openzero?label=version" /></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green.svg" /></a>
 </p>
 
 ---
@@ -13,13 +13,13 @@
 
 ```bash
 # Latest stable release
-curl -fsSL https://raw.githubusercontent.com/codercodingthecode/openzero/dev/install | bash
+curl -fsSL https://openzero.lavor.me/install | bash
 
 # Latest nightly (prerelease)
-curl -fsSL https://raw.githubusercontent.com/codercodingthecode/openzero/dev/install | bash -s -- --nightly
+curl -fsSL https://openzero.lavor.me/install | bash -s -- --nightly
 
 # Specific version
-curl -fsSL https://raw.githubusercontent.com/codercodingthecode/openzero/dev/install | bash -s -- --version 1.2.11
+curl -fsSL https://openzero.lavor.me/install | bash -s -- --version 1.2.11
 ```
 
 ---
