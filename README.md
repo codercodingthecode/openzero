@@ -218,6 +218,8 @@ OpenZero ships with a SQLite-backed settings system (migrated from the baseline 
 
 Memory behavior is fully configurable via the TUI settings panel or the project configuration file:
 
+![Memory Settings UI](docs/images/memory-settings.png)
+
 - **Enabled/Disabled** -- Toggle the entire memory pipeline on or off.
 - **Extraction Model** -- The LLM used for structured fact extraction (default: Qwen 2.5 72B Instruct via OpenRouter).
 - **Embedding Model** -- The model used to generate vector embeddings (default: Qwen3-Embedding-8B, 4096 dimensions).
@@ -226,6 +228,8 @@ Memory behavior is fully configurable via the TUI settings panel or the project 
 - **Qdrant Connection** -- URL, collection name, and vector dimensionality for the Qdrant instance.
 
 ### Compression Settings
+
+![Compression Context Display](docs/images/compression-context.png)
 
 - **Tier 1 Window** -- Number of recent exchanges kept at full fidelity (default: 3).
 - **Tier 2 Window** -- Number of exchanges summarized at medium detail (default: 7).
