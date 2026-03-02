@@ -16,6 +16,8 @@ import { Log } from "../../util/log"
 import { PermissionNext } from "@/permission/next"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
+import { Config } from "../../config/config"
+import { Provider } from "../../provider/provider"
 
 const log = Log.create({ service: "server" })
 
@@ -518,25 +520,20 @@ export const SessionRoutes = lazy(() =>
         const body = c.req.valid("json")
         const session = await Session.get(sessionID)
         await SessionRevert.cleanup(session)
-        const msgs = await Session.messages({ sessionID })
-        let currentAgent = await Agent.defaultAgent()
-        for (let i = msgs.length - 1; i >= 0; i--) {
-          const info = msgs[i].info
-          if (info.role === "user") {
-            currentAgent = info.agent || (await Agent.defaultAgent())
-            break
-          }
+
+        // Use Memory Model for compression instead of user-selected model
+        const config = await Config.get()
+        const memoryModel = config.experimental?.memory?.model
+        if (!memoryModel) {
+          return c.json({ error: "Memory Model not configured. Set experimental.memory.model in settings." }, 400)
         }
-        await SessionCompaction.create({
-          sessionID,
-          agent: currentAgent,
-          model: {
-            providerID: body.providerID,
-            modelID: body.modelID,
-          },
-          auto: body.auto,
-        })
-        await SessionPrompt.loop({ sessionID })
+        const [providerId, modelId] = memoryModel.split("/")
+        const model = await Provider.getModel(providerId, modelId)
+
+        // Trigger new compression system (SessionCompression)
+        const { SessionCompression } = await import("../../session/compression")
+        await SessionCompression.maybeCompress({ sessionID, model })
+
         return c.json(true)
       },
     )

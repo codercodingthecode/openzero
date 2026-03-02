@@ -33,6 +33,7 @@ import { spawn } from "child_process"
 import { Command } from "../command"
 import { $, fileURLToPath, pathToFileURL } from "bun"
 import { ConfigMarkdown } from "../config/markdown"
+import { Config } from "../config/config"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@openzero/util/error"
 import { fn } from "@/util/fn"
@@ -1917,11 +1918,18 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
     const agent = await Agent.get("title")
     if (!agent) return
+
+    // Use Memory Model from config instead of provider's small model
+    const config = await Config.get()
+    const memoryModel = config.experimental?.memory?.model
+    if (!memoryModel) {
+      throw new Error("Memory Model not configured. Set experimental.memory.model in settings.")
+    }
+    const [providerId, modelId] = memoryModel.split("/")
+
     const model = await iife(async () => {
       if (agent.model) return await Provider.getModel(agent.model.providerID, agent.model.modelID)
-      return (
-        (await Provider.getSmallModel(input.providerID)) ?? (await Provider.getModel(input.providerID, input.modelID))
-      )
+      return await Provider.getModel(providerId, modelId)
     })
     const result = await LLM.stream({
       agent,
