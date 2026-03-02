@@ -33,6 +33,7 @@ import { PackageRegistry } from "@/bun/registry"
 import { proxied } from "@/util/proxied"
 import { iife } from "@/util/iife"
 import { Control } from "@/control"
+import { GlobalSettings } from "../global/settings"
 
 export namespace Config {
   const ModelId = z.string().meta({ $ref: "https://models.dev/model-schema.json#/$defs/Model" })
@@ -251,6 +252,19 @@ export namespace Config {
     }
 
     result.plugin = deduplicatePlugins(result.plugin ?? [])
+
+    // Override memory model from SQLite (takes precedence over JSON config)
+    const memoryModel = GlobalSettings.getMemoryModel()
+    if (memoryModel) {
+      if (!result.experimental) result.experimental = {}
+      if (!result.experimental.memory) {
+        result.experimental.memory = {
+          enabled: false,
+          max_results: 5,
+        }
+      }
+      result.experimental.memory.model = memoryModel
+    }
 
     return {
       config: result,
@@ -1489,6 +1503,22 @@ export namespace Config {
   }
 
   export async function updateGlobal(config: Info) {
+    // Extract memory model and save to SQLite instead of JSON
+    const memoryModel = config.experimental?.memory?.model
+    if (memoryModel) {
+      GlobalSettings.setMemoryModel(memoryModel)
+    }
+
+    // Remove memory.model from config before writing to JSON
+    const configForJson = { ...config }
+    if (configForJson.experimental?.memory) {
+      const { model, ...memoryWithoutModel } = configForJson.experimental.memory
+      configForJson.experimental = {
+        ...configForJson.experimental,
+        memory: memoryWithoutModel as any,
+      }
+    }
+
     const filepath = globalConfigFile()
     const before = await Filesystem.readText(filepath).catch((err: any) => {
       if (err.code === "ENOENT") return "{}"
@@ -1498,12 +1528,12 @@ export namespace Config {
     const next = await (async () => {
       if (!filepath.endsWith(".jsonc")) {
         const existing = parseConfig(before, filepath)
-        const merged = mergeDeep(existing, config)
+        const merged = mergeDeep(existing, configForJson)
         await Filesystem.writeJson(filepath, merged)
         return merged
       }
 
-      const updated = patchJsonc(before, config)
+      const updated = patchJsonc(before, configForJson)
       const merged = parseConfig(updated, filepath)
       await Filesystem.write(filepath, updated)
       return merged
