@@ -103,17 +103,11 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const msg = await MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID })
       if (msg.info.role !== "assistant") throw new Error("Not an assistant message")
 
-      // Use Memory Model for subagents when agent.model is not explicitly set
-      const model =
-        agent.model ??
-        (await (async () => {
-          const memoryModel = config.experimental?.memory?.model
-          if (!memoryModel) {
-            throw new Error("Memory Model not configured. Set experimental.memory.model in settings.")
-          }
-          const [providerId, modelId] = memoryModel.split("/")
-          return { providerID: providerId, modelID: modelId }
-        })())
+      // Subagents inherit parent message's model when agent.model is not explicitly set
+      const model = agent.model ?? {
+        modelID: msg.info.modelID,
+        providerID: msg.info.providerID,
+      }
 
       ctx.metadata({
         title: params.description,

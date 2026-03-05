@@ -6,6 +6,11 @@ import { Log } from "../util/log"
 
 const log = Log.create({ service: "memory-extraction" })
 
+export interface ExtractionResult {
+  facts: MemorySchema.StructuredMemory[]
+  error?: string
+}
+
 /**
  * Extract structured facts from conversation messages using LLM.
  *
@@ -17,12 +22,12 @@ const log = Log.create({ service: "memory-extraction" })
  *
  * @param messages - Array of conversation messages with role and content
  * @param memoryModel - Model configuration {provider, model}
- * @returns Array of validated structured memory objects
+ * @returns ExtractionResult with facts and optional error message
  */
 export async function extractStructuredFacts(
   messages: Array<{ role: string; content: string }>,
   memoryModel: { provider: string; model: string },
-): Promise<MemorySchema.StructuredMemory[]> {
+): Promise<ExtractionResult> {
   const start = Date.now()
 
   try {
@@ -62,11 +67,12 @@ export async function extractStructuredFacts(
     try {
       parsed = JSON.parse(cleaned)
     } catch (parseError) {
-      log.error("failed to parse LLM extraction response as JSON", {
+      const errorMsg = `Failed to parse memory extraction response as JSON. Model may not support JSON output format.`
+      log.error(errorMsg, {
         response: cleaned.substring(0, 500),
         error: parseError,
       })
-      return []
+      return { facts: [], error: errorMsg }
     }
 
     // Validate and collect structured facts
@@ -74,8 +80,9 @@ export async function extractStructuredFacts(
     const rawFacts = parsed.facts || []
 
     if (!Array.isArray(rawFacts)) {
-      log.warn("LLM response 'facts' field is not an array", { parsed })
-      return []
+      const errorMsg = `Memory extraction response 'facts' field is not an array`
+      log.warn(errorMsg, { parsed })
+      return { facts: [], error: errorMsg }
     }
 
     for (const fact of rawFacts) {
@@ -96,7 +103,7 @@ export async function extractStructuredFacts(
       durationMs,
     })
 
-    return facts
+    return { facts }
   } catch (error) {
     const durationMs = Date.now() - start
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -106,17 +113,21 @@ export async function extractStructuredFacts(
       durationMs,
     })
 
-    // Return empty array on failure - caller can decide fallback strategy
-    return []
+    return { facts: [], error: errorMessage }
   }
 }
 
 /**
- * Strip markdown code blocks from text (LLMs sometimes wrap JSON in ```json)
+ * Strip markdown code blocks and thinking content from text.
+ * LLMs sometimes wrap JSON in ```json blocks, and thinking models
+ * output reasoning content in <think>...</think> tags before JSON.
  */
 function stripCodeBlocks(text: string): string {
+  // Remove <think>...</think> blocks (thinking model reasoning content)
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>\s*/g, "")
+
   // Remove ```json ... ``` blocks
-  let cleaned = text.replace(/```(?:json)?\s*\n?([\s\S]*?)\n?```/g, "$1")
+  cleaned = cleaned.replace(/```(?:json)?\s*\n?([\s\S]*?)\n?```/g, "$1")
 
   // Remove leading/trailing whitespace
   cleaned = cleaned.trim()

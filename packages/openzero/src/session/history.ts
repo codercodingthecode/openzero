@@ -306,8 +306,8 @@ ${text}
 Summary:`
 
     try {
-      const cfg = await Config.get()
-      const memoryModel = cfg.experimental?.memory?.model
+      const { GlobalSettings } = await import("../global/settings")
+      const memoryModel = GlobalSettings.getMemoryModel()
       if (!memoryModel) {
         throw new Error("Memory Model not configured. Set experimental.memory.model in settings.")
       }
@@ -352,8 +352,8 @@ ${allSummaries}
 Combined summary:`
 
     try {
-      const cfg = await Config.get()
-      const memoryModel = cfg.experimental?.memory?.model
+      const { GlobalSettings } = await import("../global/settings")
+      const memoryModel = GlobalSettings.getMemoryModel()
       if (!memoryModel) {
         throw new Error("Memory Model not configured. Set experimental.memory.model in settings.")
       }

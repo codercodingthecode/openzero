@@ -1916,15 +1916,17 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     const subtaskParts = firstRealUser.parts.filter((p) => p.type === "subtask") as MessageV2.SubtaskPart[]
     const hasOnlySubtaskParts = subtaskParts.length > 0 && firstRealUser.parts.every((p) => p.type === "subtask")
 
+    // GUARD: Skip title generation if Memory Model not configured
+    const { GlobalSettings } = await import("../global/settings")
+    const memoryModel = GlobalSettings.getMemoryModel()
+    if (!memoryModel) {
+      log.warn("skipping title generation - memory model not configured")
+      return
+    }
+    log.info("title generation using memory model", { model: memoryModel })
+
     const agent = await Agent.get("title")
     if (!agent) return
-
-    // Use Memory Model from config instead of provider's small model
-    const config = await Config.get()
-    const memoryModel = config.experimental?.memory?.model
-    if (!memoryModel) {
-      throw new Error("Memory Model not configured. Set experimental.memory.model in settings.")
-    }
     const [providerId, modelId] = memoryModel.split("/")
 
     const model = await iife(async () => {
