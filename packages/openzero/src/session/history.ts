@@ -3,6 +3,7 @@ import { Token } from "../util/token"
 import { MessageV2 } from "./message-v2"
 import { streamText } from "ai"
 import { Provider } from "../provider/provider"
+import { Config } from "../config/config"
 
 /**
  * Hierarchical history management inspired by Agent Zero.
@@ -305,7 +306,13 @@ ${text}
 Summary:`
 
     try {
-      const model = await Provider.getModel("openai", "gpt-4o-mini")
+      const { GlobalSettings } = await import("../global/settings")
+      const memoryModel = GlobalSettings.getMemoryModel()
+      if (!memoryModel) {
+        throw new Error("Memory Model not configured. Set experimental.memory.model in settings.")
+      }
+      const [providerId, modelId] = memoryModel.split("/")
+      const model = await Provider.getModel(providerId, modelId)
       const language = await Provider.getLanguage(model)
 
       const result = await streamText({
@@ -321,8 +328,7 @@ Summary:`
       return summary.trim()
     } catch (error) {
       log.error("failed to summarize messages", { error })
-      // Fallback: truncate
-      return text.length > 300 ? text.substring(0, 300) + "..." : text
+      throw error
     }
   }
 
@@ -346,7 +352,13 @@ ${allSummaries}
 Combined summary:`
 
     try {
-      const model = await Provider.getModel("openai", "gpt-4o-mini")
+      const { GlobalSettings } = await import("../global/settings")
+      const memoryModel = GlobalSettings.getMemoryModel()
+      if (!memoryModel) {
+        throw new Error("Memory Model not configured. Set experimental.memory.model in settings.")
+      }
+      const [providerId, modelId] = memoryModel.split("/")
+      const model = await Provider.getModel(providerId, modelId)
       const language = await Provider.getLanguage(model)
 
       const result = await streamText({
@@ -365,10 +377,7 @@ Combined summary:`
       }
     } catch (error) {
       log.error("failed to merge bulks", { error })
-      return {
-        topics: bulks.flatMap((b) => b.topics),
-        summary: allSummaries.length > 500 ? allSummaries.substring(0, 500) + "..." : allSummaries,
-      }
+      throw error
     }
   }
 

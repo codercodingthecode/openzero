@@ -6,6 +6,7 @@ import { Database, eq } from "../storage/db"
 import { SessionTable } from "./session.sql"
 import { generateText } from "ai"
 import { MessageV2 } from "./message-v2"
+import { GlobalSettings } from "../global/settings"
 
 /**
  * Async session state updater.
@@ -44,9 +45,15 @@ export namespace SessionStateUpdate {
 
     const current = session.state_record ? SessionState.deserialize(session.state_record) : SessionState.create()
 
-    const small = await Provider.getSmallModel(input.providerID)
+    const memoryModel = GlobalSettings.getMemoryModel()
+    if (!memoryModel) {
+      log.warn("memory model not configured, skipping state update")
+      return
+    }
+    const [providerId, modelId] = memoryModel.split("/")
+    const small = await Provider.getModel(providerId, modelId)
     if (!small) {
-      log.warn("no small model available for state update", { providerID: input.providerID })
+      log.warn("memory model not available", { memoryModel })
       return
     }
 

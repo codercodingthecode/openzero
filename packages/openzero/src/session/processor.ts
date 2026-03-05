@@ -245,10 +245,35 @@ export namespace SessionProcessor {
                     usage: value.usage,
                     metadata: value.providerMetadata,
                   })
+
+                  // Log cache information for Claude/Anthropic models
+                  const cacheRead = usage.tokens.cache.read
+                  const cacheWrite = usage.tokens.cache.write
+                  const totalInput = usage.tokens.input + cacheRead + cacheWrite
+                  const hasCacheActivity = cacheRead > 0 || cacheWrite > 0
+
+                  if (hasCacheActivity) {
+                    const cacheHitRate = totalInput > 0 ? Math.round((cacheRead / totalInput) * 100) : 0
+                    const cacheSavings =
+                      cacheRead > 0
+                        ? (input.model.cost?.input ?? 0) * (cacheRead / 1_000_000) * 0.9 // 90% savings on cached tokens
+                        : 0
+
+                    log.info("CACHE ACTIVITY", {
+                      cacheRead,
+                      cacheWrite,
+                      cacheHitRate: `${cacheHitRate}%`,
+                      estimatedSavings: `$${cacheSavings.toFixed(4)}`,
+                      model: input.model.id,
+                    })
+                  }
+
                   log.info("TOKEN USAGE", {
                     inputTokens: value.usage.inputTokens,
                     outputTokens: value.usage.outputTokens,
                     totalTokens: (value.usage.inputTokens ?? 0) + (value.usage.outputTokens ?? 0),
+                    cacheRead,
+                    cacheWrite,
                     model: input.model.id,
                   })
                   input.assistantMessage.finish = value.finishReason

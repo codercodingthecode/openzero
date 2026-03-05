@@ -28,3 +28,9 @@ opencode-dev
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Claude analysis and planning docs
+CLAUDE_API_COST_ANALYSIS.md
+CLAUDE_CACHING_CHANGES.md
+CLAUDE_CACHING_PLAN.md
+cursor-llm/
