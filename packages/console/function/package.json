@@ -1,6 +1,6 @@
 {
   "name": "@openzero/console-function",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "$schema": "https://json.schemastore.org/package.json",
   "private": true,
   "type": "module",
