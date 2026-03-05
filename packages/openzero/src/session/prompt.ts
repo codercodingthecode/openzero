@@ -33,6 +33,7 @@ import { spawn } from "child_process"
 import { Command } from "../command"
 import { $, fileURLToPath, pathToFileURL } from "bun"
 import { ConfigMarkdown } from "../config/markdown"
+import { Config } from "../config/config"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@openzero/util/error"
 import { fn } from "@/util/fn"
@@ -1915,13 +1916,22 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     const subtaskParts = firstRealUser.parts.filter((p) => p.type === "subtask") as MessageV2.SubtaskPart[]
     const hasOnlySubtaskParts = subtaskParts.length > 0 && firstRealUser.parts.every((p) => p.type === "subtask")
 
+    // GUARD: Skip title generation if Memory Model not configured
+    const { GlobalSettings } = await import("../global/settings")
+    const memoryModel = GlobalSettings.getMemoryModel()
+    if (!memoryModel) {
+      log.warn("skipping title generation - memory model not configured")
+      return
+    }
+    log.info("title generation using memory model", { model: memoryModel })
+
     const agent = await Agent.get("title")
     if (!agent) return
+    const [providerId, modelId] = memoryModel.split("/")
+
     const model = await iife(async () => {
       if (agent.model) return await Provider.getModel(agent.model.providerID, agent.model.modelID)
-      return (
-        (await Provider.getSmallModel(input.providerID)) ?? (await Provider.getModel(input.providerID, input.modelID))
-      )
+      return await Provider.getModel(providerId, modelId)
     })
     const result = await LLM.stream({
       agent,

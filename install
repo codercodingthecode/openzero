@@ -434,6 +434,123 @@ install_qdrant() {
 
 install_qdrant
 
+# Setup Qdrant persistence (auto-start on boot/login)
+setup_qdrant_persistence() {
+    local qdrant_bin="$HOME/.local/share/openzero/bin/qdrant"
+    local qdrant_data="$HOME/.local/share/openzero/memory/qdrant-data"
+    local qdrant_config="$HOME/.local/share/openzero/memory/qdrant-config.yaml"
+    
+    # Create Qdrant config file
+    mkdir -p "$HOME/.local/share/openzero/memory"
+    mkdir -p "$qdrant_data"
+    
+    cat > "$qdrant_config" <<EOF
+storage:
+  storage_path: $qdrant_data
+service:
+  grpc_port: 6334
+  http_port: 6333
+log_level: WARN
+EOF
+    
+    case "$os" in
+        darwin)
+            setup_qdrant_launchd "$qdrant_bin" "$qdrant_config"
+            ;;
+        linux)
+            setup_qdrant_systemd "$qdrant_bin" "$qdrant_config"
+            ;;
+        *)
+            print_message warning "Qdrant persistence not supported for $os - you'll need to start it manually"
+            ;;
+    esac
+}
+
+# macOS: Create LaunchAgent plist
+setup_qdrant_launchd() {
+    local qdrant_bin="$1"
+    local qdrant_config="$2"
+    local launch_agents_dir="$HOME/Library/LaunchAgents"
+    local plist_file="$launch_agents_dir/com.openzero.qdrant.plist"
+    
+    mkdir -p "$launch_agents_dir"
+    
+    cat > "$plist_file" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.openzero.qdrant</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$qdrant_bin</string>
+        <string>--config-path</string>
+        <string>$qdrant_config</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>$HOME/.local/share/openzero/memory/qdrant.log</string>
+    <key>StandardErrorPath</key>
+    <string>$HOME/.local/share/openzero/memory/qdrant.error.log</string>
+    <key>WorkingDirectory</key>
+    <string>$HOME/.local/share/openzero/memory</string>
+</dict>
+</plist>
+EOF
+    
+    # Load the service using modern launchctl API (macOS 12+), fall back to legacy
+    if command -v launchctl >/dev/null 2>&1; then
+        local domain="gui/$(id -u)"
+        launchctl bootout "$domain/com.openzero.qdrant" 2>/dev/null || true
+        launchctl bootstrap "$domain" "$plist_file" 2>/dev/null || \
+            { launchctl unload "$plist_file" 2>/dev/null || true; launchctl load "$plist_file" 2>/dev/null || true; }
+        print_message info "${MUTED}✓ Qdrant LaunchAgent installed (auto-starts on login)${NC}"
+        print_message info "${MUTED}  To manage: launchctl bootout/bootstrap gui/$(id -u) $plist_file${NC}"
+    fi
+}
+
+# Linux: Create systemd user service
+setup_qdrant_systemd() {
+    local qdrant_bin="$1"
+    local qdrant_config="$2"
+    local systemd_user_dir="$HOME/.config/systemd/user"
+    local service_file="$systemd_user_dir/qdrant.service"
+    
+    mkdir -p "$systemd_user_dir"
+    
+    cat > "$service_file" <<EOF
+[Unit]
+Description=Qdrant Vector Database for OpenZero
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$qdrant_bin --config-path $qdrant_config
+Restart=always
+RestartSec=5
+WorkingDirectory=$HOME/.local/share/openzero/memory
+StandardOutput=append:$HOME/.local/share/openzero/memory/qdrant.log
+StandardError=append:$HOME/.local/share/openzero/memory/qdrant.error.log
+
+[Install]
+WantedBy=default.target
+EOF
+    
+    # Enable and start the service if systemd is available
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --user daemon-reload 2>/dev/null || true
+        systemctl --user enable qdrant.service 2>/dev/null || true
+        systemctl --user start qdrant.service 2>/dev/null || true
+        print_message info "${MUTED}✓ Qdrant systemd service installed (auto-starts on login)${NC}"
+        print_message info "${MUTED}  To manage: systemctl --user start/stop/status qdrant${NC}"
+    fi
+}
+
+setup_qdrant_persistence
 
 add_to_path() {
     local config_file=$1
@@ -531,6 +648,6 @@ echo -e ""
 echo -e "cd <project>  ${MUTED}# Open directory${NC}"
 echo -e "openzero      ${MUTED}# Run command${NC}"
 echo -e ""
-echo -e "${MUTED}Memory system installed - configure via TUI settings${NC}"
+echo -e "${MUTED}Memory system installed with auto-start persistence${NC}"
 echo -e ""
 echo -e ""

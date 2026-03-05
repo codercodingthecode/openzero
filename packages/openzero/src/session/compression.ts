@@ -4,6 +4,7 @@ import { SessionHistory } from "./history"
 import { Provider } from "../provider/provider"
 import { Database, eq } from "../storage/db"
 import { SessionTable } from "./session.sql"
+import { Config } from "../config/config"
 
 /**
  * Hierarchical history compression based on Agent Zero's approach.
@@ -77,6 +78,15 @@ export namespace SessionCompression {
         })
         return
       }
+
+      // GUARD: Skip compression if Memory Model not configured
+      const { GlobalSettings } = await import("../global/settings")
+      const memoryModel = GlobalSettings.getMemoryModel()
+      if (!memoryModel) {
+        log.warn("skipping compression - memory model not configured", { sessionID: config.sessionID })
+        return
+      }
+      log.info("compression using memory model", { model: memoryModel, sessionID: config.sessionID })
 
       log.info("compressing session history", {
         sessionID: config.sessionID,

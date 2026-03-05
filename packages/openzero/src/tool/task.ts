@@ -103,6 +103,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const msg = await MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID })
       if (msg.info.role !== "assistant") throw new Error("Not an assistant message")
 
+      // Subagents inherit parent message's model when agent.model is not explicitly set
       const model = agent.model ?? {
         modelID: msg.info.modelID,
         providerID: msg.info.providerID,

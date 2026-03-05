@@ -172,9 +172,6 @@ export namespace ProviderTransform {
   }
 
   function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage[] {
-    const system = msgs.filter((msg) => msg.role === "system").slice(0, 2)
-    const final = msgs.filter((msg) => msg.role !== "system").slice(-2)
-
     const providerOptions = {
       anthropic: {
         cacheControl: { type: "ephemeral" },
@@ -193,7 +190,29 @@ export namespace ProviderTransform {
       },
     }
 
-    for (const msg of unique([...system, ...final])) {
+    // Check if this is a Claude/Anthropic model
+    const isClaudeModel =
+      model.providerID === "anthropic" ||
+      model.api.id.includes("anthropic") ||
+      model.api.id.includes("claude") ||
+      model.id.includes("anthropic") ||
+      model.id.includes("claude") ||
+      model.api.npm === "@ai-sdk/anthropic" ||
+      model.api.npm === "@ai-sdk/google-vertex/anthropic"
+
+    // For Claude models, use intelligent breakpoint placement
+    // For other providers, use legacy behavior (first 2 system + last 2 messages)
+    const breakpointIndices = isClaudeModel
+      ? identifyClaudeCacheBreakpoints(msgs)
+      : [
+          ...msgs.filter((msg) => msg.role === "system").slice(0, 2),
+          ...msgs.filter((msg) => msg.role !== "system").slice(-2),
+        ].map((msg) => msgs.indexOf(msg))
+
+    // Apply cache control to messages at identified breakpoints
+    for (const idx of breakpointIndices) {
+      if (idx < 0 || idx >= msgs.length) continue
+      const msg = msgs[idx]
       const useMessageLevelOptions = model.providerID === "anthropic" || model.providerID.includes("bedrock")
       const shouldUseContentOptions = !useMessageLevelOptions && Array.isArray(msg.content) && msg.content.length > 0
 
@@ -209,6 +228,72 @@ export namespace ProviderTransform {
     }
 
     return msgs
+  }
+
+  /**
+   * Identify optimal cache breakpoints for Claude models based on message structure.
+   * Returns indices of messages where cache breakpoints should be placed (max 4).
+   *
+   * Strategy:
+   * 1. After system messages (stable agent/provider prompts)
+   * 2. After stable user content (environment, tools - before history)
+   * 3. After ancient history bulks (very stable compressed content)
+   * 4. After topic summaries (fairly stable compressed content)
+   *
+   * Does NOT cache:
+   * - Current topic summaries (change frequently)
+   * - Recent raw exchanges (change every turn)
+   */
+  function identifyClaudeCacheBreakpoints(msgs: ModelMessage[]): number[] {
+    const breakpoints: number[] = []
+
+    // Helper: check if message content contains a substring
+    const hasContent = (msg: ModelMessage, substr: string): boolean => {
+      if (typeof msg.content === "string") return msg.content.includes(substr)
+      if (Array.isArray(msg.content)) {
+        return msg.content.some((part) => part.type === "text" && part.text.includes(substr))
+      }
+      return false
+    }
+
+    // Breakpoint 1: After last system message (agent/provider prompt)
+    const lastSystemIdx = msgs.findLastIndex((m) => m.role === "system")
+    if (lastSystemIdx >= 0) {
+      breakpoints.push(lastSystemIdx)
+    }
+
+    // Find the range of user messages (everything after system)
+    const userMsgs = msgs.slice(lastSystemIdx + 1)
+    const userStartIdx = lastSystemIdx + 1
+
+    // Breakpoint 2: After stable user content (environment/instructions), before history
+    // Look for the first message that contains history markers
+    const firstHistoryIdx = userMsgs.findIndex(
+      (m) =>
+        m.role === "user" &&
+        (hasContent(m, "[Ancient history]") || hasContent(m, "[Previous topic]") || hasContent(m, "summary-")),
+    )
+
+    if (firstHistoryIdx > 0) {
+      // Cache everything before history starts
+      breakpoints.push(userStartIdx + firstHistoryIdx - 1)
+    }
+
+    // Breakpoint 3: After ancient history bulks (very stable)
+    const lastBulkIdx = msgs.findLastIndex((m) => m.role === "user" && hasContent(m, "[Ancient history]"))
+    if (lastBulkIdx >= 0 && !breakpoints.includes(lastBulkIdx)) {
+      breakpoints.push(lastBulkIdx)
+    }
+
+    // Breakpoint 4: After topic summaries (fairly stable)
+    const lastTopicIdx = msgs.findLastIndex((m) => m.role === "user" && hasContent(m, "[Previous topic]"))
+    if (lastTopicIdx >= 0 && !breakpoints.includes(lastTopicIdx) && lastTopicIdx > (lastBulkIdx ?? -1)) {
+      breakpoints.push(lastTopicIdx)
+    }
+
+    // Claude allows max 4 cache breakpoints, take the most valuable ones
+    // Sort by index to maintain order, then take first 4
+    return breakpoints.sort((a, b) => a - b).slice(0, 4)
   }
 
   function unsupportedParts(msgs: ModelMessage[], model: Provider.Model): ModelMessage[] {

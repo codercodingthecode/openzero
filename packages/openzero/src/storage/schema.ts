@@ -3,3 +3,4 @@ export { SessionTable, MessageTable, PartTable, TodoTable, PermissionTable } fro
 export { SessionShareTable } from "../share/share.sql"
 export { ProjectTable } from "../project/project.sql"
 export { ProviderTable, ProviderModelTable } from "../provider/registry.sql"
+export { GlobalSettingsTable } from "../global/global.sql"

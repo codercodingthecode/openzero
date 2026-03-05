@@ -107,9 +107,18 @@ export namespace SessionCompaction {
   }) {
     const userMessage = input.messages.findLast((m) => m.info.id === input.parentID)!.info as MessageV2.User
     const agent = await Agent.get("compaction")
+
+    // Use Memory Model from config instead of user's main chat model
+    const config = await Config.get()
+    const memoryModel = config.experimental?.memory?.model
+    if (!memoryModel) {
+      throw new Error("Memory Model not configured. Set experimental.memory.model in settings.")
+    }
+    const [providerId, modelId] = memoryModel.split("/")
+
     const model = agent.model
       ? await Provider.getModel(agent.model.providerID, agent.model.modelID)
-      : await Provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
+      : await Provider.getModel(providerId, modelId)
     const msg = (await Session.updateMessage({
       id: Identifier.ascending("message"),
       role: "assistant",

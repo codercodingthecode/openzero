@@ -171,7 +171,16 @@ export namespace MemoryHooks {
           ? { provider: parts[0], model: parts.slice(1).join("/") }
           : { provider: "openai", model: modelString }
 
-      const facts = await extractStructuredFacts(messages, memoryModel)
+      const extractionResult = await extractStructuredFacts(messages, memoryModel)
+
+      if (extractionResult.error) {
+        log.error("memory extraction failed", { error: extractionResult.error })
+        await Bus.publish(MemoryError, { error: `Memory Extraction Failed: ${extractionResult.error}` })
+        await Bus.publish(MemoryMemorizeCompleted, { count: 0 })
+        return
+      }
+
+      const facts = extractionResult.facts
 
       if (facts.length === 0) {
         log.debug("no facts extracted from conversation", { durationMs: durationMs(start) })
