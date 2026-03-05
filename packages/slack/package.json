@@ -1,6 +1,6 @@
 {
   "name": "@openzero/slack",
-  "version": "1.2.10",
+  "version": "0.0.2",
   "type": "module",
   "license": "MIT",
   "scripts": {

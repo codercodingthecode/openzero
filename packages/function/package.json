@@ -1,6 +1,6 @@
 {
   "name": "@openzero/function",
-  "version": "1.2.10",
+  "version": "0.0.2",
   "$schema": "https://json.schemastore.org/package.json",
   "private": true,
   "type": "module",
